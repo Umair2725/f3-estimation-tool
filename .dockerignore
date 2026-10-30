@@ -1,0 +1,23 @@
+# Keep the build context small and free of secrets and client data.
+.git
+node_modules
+.next
+out
+build
+coverage
+playwright-report
+test-results
+src/generated
+
+.env*
+!.env.example
+
+uploads
+samples
+local-data
+
+docs
+data
+openspec
+.claude
+*.md

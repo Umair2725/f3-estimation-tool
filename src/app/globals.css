@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Color tokens. Light by default, dark when the system prefers it (app-shell spec). */
+:root {
+  --background: #f7f7f8;
+  --surface: #ffffff;
+  --foreground: #1c1c21;
+  --muted: #5d5d68;
+  --border: #e2e2e7;
+  --accent: #1f5fbf;
+  --notice-bg: #eef4fd;
+  --notice-fg: #173f7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121216;
+    --surface: #1b1b21;
+    --foreground: #ececf1;
+    --muted: #a3a3b0;
+    --border: #2d2d36;
+    --accent: #7aa7f0;
+    --notice-bg: #17243a;
+    --notice-fg: #c5d8f7;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-notice-bg: var(--notice-bg);
+  --color-notice-fg: var(--notice-fg);
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

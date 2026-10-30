@@ -1,0 +1,19 @@
+# Generated or vendored
+node_modules
+.next
+out
+build
+coverage
+playwright-report
+test-results
+package-lock.json
+next-env.d.ts
+src/generated
+
+# Planning and reference material is edited by hand, not reformatted
+docs
+data
+openspec
+.claude
+AGENTS.md
+README.md
