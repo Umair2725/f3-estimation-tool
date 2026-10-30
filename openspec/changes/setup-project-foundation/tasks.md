@@ -43,7 +43,7 @@
 
 ## 8. CI
 
-- [ ] 8.1 Add `.github/workflows/ci.yml` (on push and pull request: pgvector service container, `npm ci`, Prisma generate + migrate deploy, lint, typecheck, unit tests, build, Playwright smoke tests with retries; upload the Playwright report on failure); verify the workflow passes on GitHub for this branch
+- [x] 8.1 Add `.github/workflows/ci.yml` (on push and pull request: pgvector service container, `npm ci`, Prisma generate + migrate deploy, lint, typecheck, unit tests, build, Playwright smoke tests with retries; upload the Playwright report on failure); verify the workflow passes on GitHub for this branch
 
 ## 9. Documentation
 
@@ -51,7 +51,7 @@
 
 ## 10. Integration check
 
-- [ ] 10.1 From a fresh clone of the branch, run `docker compose up --build`, open the home page in light and dark mode and at phone width, hit `/api/health` with the database up and down, and confirm CI is green; record the result in the change's pull request description
+- [x] 10.1 From a fresh clone of the branch, run `docker compose up --build`, open the home page in light and dark mode and at phone width, hit `/api/health` with the database up and down, and confirm CI is green; record the result in the change's pull request description
 
 ## Workflow follow-up
 
