@@ -1,0 +1,21 @@
+// F3 Estimation Tool database schema.
+// The connection URL comes from prisma.config.ts (DATABASE_URL); see .env.example.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Small key/value table for application metadata (e.g. schema label).
+// Business tables arrive with later changes.
+model AppMeta {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_meta")
+}
