@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F3 Estimation Tool · UX prototype</title>
+<meta name="description" content="Clickable UX prototype for Folio3's internal estimation tool. Demo data only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== Design tokens (Folio3 brand, see docs/design/README.md) ===== */
+:root {
+  --brand-red: #F32735;        /* logo + accents (folio3.com) */
+  --brand-red-strong: #D91E2B; /* buttons/links with white text: 5:1 contrast */
+  --brand-yellow: #FFCB11;     /* highlights, never as text on white */
+  --ink: #171819;
+  --ink-2: #4A4B4E;
+  --muted: #6B6C70;
+  --line: #E2E2E4;
+  --line-strong: #D4D4D4;
+  --surface: #FFFFFF;
+  --surface-2: #F5F5F5;
+  --bg: #FAFAFA;
+  --focus: #2563EB;
+  --ok: #157F3B;  --ok-bg: #E8F5EC;
+  --warn: #8A5A00; --warn-bg: #FFF4D1;
+  --err: #B4161F;  --err-bg: #FDE8EA;
+  --info: #1D4ED8; --info-bg: #E8EEFD;
+  --ai: #6D28D9;   --ai-bg: #F1EBFD;
+  --shadow: 0 1px 2px rgba(23,24,25,.06), 0 4px 16px rgba(23,24,25,.06);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --pill: 999px;
+  --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --brand-red-strong: #E5323E;
+  --ink: #F1F1F2; --ink-2: #C9CACD; --muted: #A2A3A8;
+  --line: #2E2F33; --line-strong: #3A3B40;
+  --surface: #1C1D20; --surface-2: #232428; --bg: #141517;
+  --ok: #4ADE80; --ok-bg: #12301E; --warn: #FCD34D; --warn-bg: #33290A;
+  --err: #F87171; --err-bg: #3A1417; --info: #93B4FD; --info-bg: #172347;
+  --ai: #C4B5FD; --ai-bg: #2A1F45; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand-red-strong: #E5323E;
+    --ink: #F1F1F2; --ink-2: #C9CACD; --muted: #A2A3A8;
+    --line: #2E2F33; --line-strong: #3A3B40;
+    --surface: #1C1D20; --surface-2: #232428; --bg: #141517;
+    --ok: #4ADE80; --ok-bg: #12301E; --warn: #FCD34D; --warn-bg: #33290A;
+    --err: #F87171; --err-bg: #3A1417; --info: #93B4FD; --info-bg: #172347;
+    --ai: #C4B5FD; --ai-bg: #2A1F45; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { margin: 0; line-height: 1.25; letter-spacing: -0.01em; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 700; }
+h3 { font-size: 15px; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--brand-red-strong); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ===== Layout ===== */
+.app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.sidebar { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: var(--ink); }
+.brand img { height: 30px; width: auto; }
+.brand .wordmark-fallback { font-weight: 700; color: var(--brand-red); font-size: 22px; }
+.brand .product { font-size: 12px; font-weight: 600; color: var(--muted); border-left: 1px solid var(--line-strong); padding-left: 10px; line-height: 1.2; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 12px 10px 4px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); color: var(--ink-2); text-decoration: none; font-weight: 500; }
+.nav a:hover { background: var(--surface-2); color: var(--ink); }
+.nav a[aria-current="page"] { background: color-mix(in srgb, var(--brand-red) 10%, transparent); color: var(--brand-red-strong); font-weight: 600; }
+.nav .badge { margin-left: auto; }
+.nav svg { width: 18px; height: 18px; flex: none; }
+.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.user { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-yellow); color: #171819; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 14px 28px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 5; }
+.crumbs { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); min-width: 0; flex-wrap: wrap; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.crumbs [aria-current] { color: var(--ink); font-weight: 600; }
+.topbar .spacer { flex: 1; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--pill); padding: 7px 14px; min-width: 260px; color: var(--muted); }
+.search input { border: 0; background: transparent; outline: none; width: 100%; color: var(--ink); }
+.kbd { font-size: 11px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+.content { padding: 28px; max-width: 1240px; width: 100%; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.page-head p { color: var(--muted); margin-top: 6px; max-width: 640px; }
+.screen { display: none; }
+.screen.active { display: block; }
+.menu-btn { display: none; }
+
+/* ===== Components ===== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: var(--pill); border: 1px solid transparent; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; transition: transform .06s ease, background .15s ease; }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 18px; height: 18px; }
+.btn-primary { background: var(--brand-red-strong); color: #fff; }
+.btn-primary:hover { background: #BF1824; }
+.btn-secondary { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost { background: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-yellow { background: var(--brand-yellow); color: #171819; }
+.btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn-lg { min-height: 48px; padding: 0 24px; font-size: 16px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; cursor: pointer; color: var(--ink-2); }
+.icon-btn:hover { background: var(--surface-2); }
+.icon-btn svg { width: 18px; height: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-pad { padding: 20px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.grid { display: grid; gap: 16px; }
+.cols-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.split { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
+/* Let grid/flex children shrink so wide tables scroll inside .table-wrap instead of the page. */
+.grid > *, .split > *, .vstack > * { min-width: 0; }
+.stat .label { font-size: 13px; color: var(--muted); font-weight: 500; }
+.stat .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+.stat .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: var(--pill); white-space: nowrap; }
+.b-draft { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line-strong); }
+.b-review { background: var(--info-bg); color: var(--info); }
+.b-changes { background: var(--warn-bg); color: var(--warn); }
+.b-approved { background: var(--ok-bg); color: var(--ok); }
+.b-exported { background: color-mix(in srgb, var(--brand-yellow) 25%, transparent); color: var(--ink); }
+.b-ai { background: var(--ai-bg); color: var(--ai); }
+.b-err { background: var(--err-bg); color: var(--err); }
+.b-count { background: var(--brand-red-strong); color: #fff; min-width: 20px; justify-content: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+td.r, th.r { text-align: right; }
+.table-wrap { overflow-x: auto; position: relative; } /* relative: keeps .sr-only labels inside the scroll box */
+.row-title { font-weight: 600; }
+.row-sub { font-size: 12px; color: var(--muted); }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field .label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.field .help { font-size: 12px; color: var(--muted); }
+.input, select.input, textarea.input { width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); }
+textarea.input { min-height: 90px; resize: vertical; }
+.input:focus { outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent); border-color: var(--focus); }
+.req { color: var(--brand-red-strong); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--pill); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 500; user-select: none; }
+.chip[aria-pressed="true"] { border-color: var(--brand-red-strong); background: color-mix(in srgb, var(--brand-red) 8%, var(--surface)); color: var(--brand-red-strong); font-weight: 600; }
+.chip[aria-pressed="true"]::before { content: "✓"; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--pill); padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: var(--pill); cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+.tabs button { border: 0; background: transparent; padding: 10px 14px; cursor: pointer; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brand-red-strong); }
+
+.alert { display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 14px; align-items: flex-start; }
+.alert svg { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.alert-info { background: var(--info-bg); color: var(--info); }
+.alert-warn { background: var(--warn-bg); color: var(--warn); }
+.alert-ok { background: var(--ok-bg); color: var(--ok); }
+.alert-err { background: var(--err-bg); color: var(--err); }
+.alert strong { color: inherit; }
+
+.stepper { display: flex; gap: 0; counter-reset: step; margin-bottom: 22px; }
+.stepper li { list-style: none; flex: 1; position: relative; padding-top: 34px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
+.stepper li::before { counter-increment: step; content: counter(step); position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--line-strong); z-index: 1; font-size: 13px; }
+.stepper li::after { content: ""; position: absolute; top: 13px; left: -50%; width: 100%; height: 2px; background: var(--line-strong); }
+.stepper li:first-child::after { display: none; }
+.stepper li.done::before { content: "✓"; background: var(--ok); border-color: var(--ok); color: #fff; }
+.stepper li.done::after, .stepper li.current::after { background: var(--ok); }
+.stepper li.current { color: var(--ink); }
+.stepper li.current::before { border-color: var(--brand-red-strong); color: var(--brand-red-strong); }
+.stepper ol { display: flex; padding: 0; margin: 0; width: 100%; }
+
+.progress { height: 8px; background: var(--surface-2); border-radius: var(--pill); overflow: hidden; border: 1px solid var(--line); }
+.progress > span { display: block; height: 100%; background: var(--ok); border-radius: var(--pill); }
+
+.dropzone { border: 2px dashed var(--line-strong); border-radius: var(--radius); padding: 28px; text-align: center; background: var(--surface-2); }
+.dropzone svg { width: 36px; height: 36px; color: var(--muted); }
+.file-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.file-icon { width: 36px; height: 42px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; flex: none; }
+.f-pdf { background: #C2262E; } .f-docx { background: #2B5797; } .f-xlsx { background: #1D7044; } .f-zip { background: #6B6C70; }
+
+.source { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: var(--pill); cursor: pointer; border: 1px solid transparent; background: none; }
+.s-bench { background: var(--ok-bg); color: var(--ok); }
+.s-hist { background: var(--info-bg); color: var(--info); }
+.s-ai { background: var(--ai-bg); color: var(--ai); border-style: dashed; border-color: currentColor; }
+.s-manual { background: var(--surface-2); color: var(--ink-2); }
+.hours { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.was { text-decoration: line-through; color: var(--muted); font-weight: 500; font-size: 12px; margin-left: 4px; }
+.actions { display: flex; gap: 6px; justify-content: flex-end; }
+.row-accepted td { background: color-mix(in srgb, var(--ok-bg) 45%, transparent); }
+.row-rejected td { opacity: .5; }
+.row-rejected .row-title { text-decoration: line-through; }
+.group-row td { background: var(--surface-2); font-weight: 700; font-size: 13px; }
+
+.totals { position: sticky; top: 84px; }
+.totals dl { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; margin: 0; font-size: 14px; }
+.totals dt { color: var(--ink-2); }
+.totals dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.totals .sum { border-top: 1px solid var(--line); padding-top: 10px; font-weight: 700; font-size: 16px; color: var(--ink); }
+.totals .cost { font-size: 22px; font-weight: 700; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.check:last-child { border-bottom: 0; }
+.check .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.ic-ok { background: var(--ok-bg); color: var(--ok); }
+.ic-warn { background: var(--warn-bg); color: var(--warn); }
+
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(23,24,25,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 32px rgba(0,0,0,.15); transform: translateX(100%); transition: transform .22s ease; z-index: 31; display: flex; flex-direction: column; }
+.drawer.open { transform: none; }
+.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+.drawer-head { padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.drawer-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.match { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.match.best { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok) inset; }
+.sim { font-size: 12px; font-weight: 700; }
+.bar { height: 6px; border-radius: var(--pill); background: var(--surface-2); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ok); }
+.quote { border-left: 3px solid var(--brand-yellow); padding: 6px 12px; background: var(--surface-2); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--ink-2); }
+
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); background: #171819; color: #fff; padding: 12px 16px; border-radius: var(--radius-sm); display: flex; gap: 14px; align-items: center; opacity: 0; pointer-events: none; transition: all .2s; z-index: 40; font-size: 14px; box-shadow: var(--shadow); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast button { background: none; border: 0; color: var(--brand-yellow); font-weight: 700; cursor: pointer; }
+
+.signin { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
+.signin-art { background: #171819; color: #fff; padding: 56px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+.signin-art h1 { font-size: 40px; font-weight: 400; line-height: 1.15; max-width: 460px; letter-spacing: -0.02em; }
+.signin-art .dots span { position: absolute; border-radius: 50%; }
+.signin-panel { display: grid; place-items: center; padding: 40px; background: var(--surface); }
+.signin-box { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 18px; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 50px; border-radius: var(--pill); border: 1px solid var(--line-strong); background: var(--surface); font-weight: 600; cursor: pointer; font-size: 15px; }
+.google-btn:hover { background: var(--surface-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.empty { text-align: center; padding: 36px 20px; color: var(--muted); }
+.empty svg { width: 44px; height: 44px; margin-bottom: 8px; }
+.kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 500; }
+.comment { display: flex; gap: 10px; }
+.comment .bubble { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; font-size: 14px; flex: 1; }
+.spark { width: 120px; height: 32px; }
+.diff-up { color: var(--err); font-weight: 600; }
+.diff-down { color: var(--ok); font-weight: 600; }
+.switch { position: relative; width: 40px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; background: var(--line-strong); border-radius: var(--pill); cursor: pointer; transition: .15s; }
+.switch span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+.switch input:checked + span { background: var(--ok); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.switch input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.toggle-row:last-child { border-bottom: 0; }
+.help-tip { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line-strong); font-size: 11px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: middle; }
+.hstack { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.vstack { display: flex; flex-direction: column; gap: 14px; }
+.mt { margin-top: 16px; } .mt-lg { margin-top: 24px; }
+.footer-bar { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 14px 28px; display: flex; justify-content: space-between; gap: 12px; align-items: center; z-index: 4; flex-wrap: wrap; }
+
+/* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .split { grid-template-columns: minmax(0,1fr); }
+  .totals { position: static; }
+  .cols-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; z-index: 35; width: 260px; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow); }
+  .sidebar.open { transform: none; }
+  .menu-btn { display: inline-grid; }
+  .search { display: none; }
+  .content { padding: 18px 16px; }
+  .topbar { padding: 12px 16px; }
+  .cols-3, .cols-2 { grid-template-columns: minmax(0,1fr); }
+  .signin { grid-template-columns: 1fr; }
+  .signin-art { display: none; }
+  .stepper li { font-size: 0; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .kv dd { margin-bottom: 8px; }
+  .footer-bar { padding: 12px 16px; }
+  h1 { font-size: 22px; }
+}
+@media (max-width: 480px) { .cols-4 { grid-template-columns: 1fr 1fr; } .stat .value { font-size: 22px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- SVG icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ SIGN-IN (no app chrome) ============ -->
+<section id="screen-signin" class="screen" aria-labelledby="signin-title">
+  <div class="signin">
+    <div class="signin-art">
+      <div class="dots" aria-hidden="true">
+        <span style="width:220px;height:220px;background:#FFCB11;right:-60px;top:80px;opacity:.9"></span>
+        <span style="width:120px;height:120px;background:#2F6FED;right:120px;top:30px;opacity:.85"></span>
+        <span style="width:160px;height:160px;background:#F32735;right:40px;top:250px;opacity:.9"></span>
+      </div>
+      <img src="https://cdn-aiml.folio3.site/media/main/f3-dbabeeaade61-71456ca3-a357-4133-9b85-98612e95d25b.png" alt="Folio3" style="height:44px;width:auto;background:#fff;border-radius:10px;padding:6px 10px;align-self:flex-start">
+      <div>
+        <h1>Estimate in hours,<br>not days.</h1>
+        <p style="margin-top:14px;max-width:420px;color:#C9CACD">Reuse Folio3's past estimates and the hours our teams really spend building with AI. Every number shows where it came from.</p>
+      </div>
+      <p class="small" style="color:#A2A3A8">Internal tool · Folio3 employees only</p>
+    </div>
+    <div class="signin-panel">
+      <div class="signin-box">
+        <div>
+          <h2 id="signin-title" style="font-size:24px">Sign in to F3 Estimation Tool</h2>
+          <p class="muted" style="margin-top:6px">Use your Folio3 Google account. No new password needed.</p>
+        </div>
+        <button class="google-btn" type="button" onclick="go('home'); toast('Signed in as Umair Khan (Admin)')">
+          <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          Continue with Google
+        </button>
+        <div class="alert alert-info"><svg><use href="#i-info"/></svg><span>Only <strong>@folio3.com</strong> accounts can sign in. An Admin assigns your role after your first sign-in.</span></div>
+        <p class="small muted">Trouble signing in? Contact the tool owner (PMO).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#home" onclick="go('home');return false">
+      <img src="https://cdn-aiml.folio3.site/media/main/f3-dbabeeaade61-71456ca3-a357-4133-9b85-98612e95d25b.png" alt="Folio3" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wordmark-fallback',textContent:'folio3'}))">
+      <span class="product">F3 Estimation<br>Tool</span>
+    </a>
+    <a class="btn btn-primary" href="#new" onclick="go('new');return false"><svg><use href="#i-plus"/></svg>New estimation</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#home" data-nav="home" onclick="go('home');return false"><svg><use href="#i-home"/></svg>Home</a>
+      <a href="#estimate" data-nav="estimate" onclick="go('estimate');return false"><svg><use href="#i-list"/></svg>Estimates</a>
+      <a href="#review" data-nav="review" onclick="go('review');return false"><svg><use href="#i-review"/></svg>Reviews<span class="badge b-count">2</span></a>
+      <div class="nav-label">Knowledge base</div>
+      <a href="#benchmarks" data-nav="benchmarks" onclick="go('benchmarks');return false"><svg><use href="#i-book"/></svg>Feature hours</a>
+      <a href="#import" data-nav="import" onclick="go('import');return false"><svg><use href="#i-upload"/></svg>Import past projects</a>
+      <a href="#actuals" data-nav="actuals" onclick="go('actuals');return false"><svg><use href="#i-clock"/></svg>Actual hours</a>
+      <div class="nav-label">Admin</div>
+      <a href="#admin" data-nav="admin" onclick="go('admin');return false"><svg><use href="#i-settings"/></svg>Settings</a>
+    </nav>
+    <div class="sidebar-foot">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="toggleTheme()" style="justify-content:flex-start"><svg><use href="#i-moon"/></svg><span id="theme-label">Dark mode</span></button>
+      <div class="user"><div class="avatar" aria-hidden="true">UK</div><div><div class="small" style="font-weight:600">Umair Khan</div><div class="small muted">Project Manager · Admin</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" type="button" aria-label="Open menu" onclick="document.getElementById('sidebar').classList.toggle('open')"><svg><use href="#i-menu"/></svg></button>
+      <nav class="crumbs" aria-label="Breadcrumb" id="crumbs"></nav>
+      <span class="spacer"></span>
+      <label class="search"><svg width="16" height="16"><use href="#i-search"/></svg><span class="sr-only">Search</span><input placeholder="Search estimates, features, clients" type="search"><span class="kbd">/</span></label>
+      <button class="icon-btn" type="button" aria-label="Help: how estimates are calculated" onclick="toast('Help center: how suggestions, AI reduction and percentages work')"><svg><use href="#i-help"/></svg></button>
+    </header>
+
+    <!-- ============ HOME ============ -->
+    <section id="screen-home" class="screen content" aria-labelledby="home-title">
+      <div class="page-head">
+        <div><h1 id="home-title">Good afternoon, Umair</h1><p>2 estimates are waiting for you. Pick up where you left off or start a new request.</p></div>
+        <a class="btn btn-primary btn-lg" href="#new" onclick="go('new');return false"><svg><use href="#i-plus"/></svg>New estimation request</a>
+      </div>
+      <div class="grid cols-4">
+        <div class="card card-pad stat"><div class="label">My drafts</div><div class="value num">3</div><div class="hint">1 not touched for 5 days</div></div>
+        <div class="card card-pad stat"><div class="label">Awaiting my review</div><div class="value num">2</div><div class="hint">Oldest submitted yesterday</div></div>
+        <div class="card card-pad stat"><div class="label">Approved this month</div><div class="value num">7</div><div class="hint">Median turnaround 1.6 days</div></div>
+        <div class="card card-pad stat"><div class="label">Knowledge base</div><div class="value num">142</div><div class="hint">past projects · 38 with actual hours</div></div>
+      </div>
+
+      <div class="card mt-lg" id="continue-card">
+        <div class="card-head"><h2>Continue where you left off</h2><span class="muted small">Autosaved 12 minutes ago</span></div>
+        <div class="card-pad hstack" style="justify-content:space-between">
+          <div><div class="row-title">Northwind Clinics · Patient portal MVP</div><div class="row-sub">Step 4 of 4 · 18 of 24 features reviewed</div>
+            <div class="progress mt" style="width:260px" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" aria-label="Review progress"><span style="width:75%"></span></div></div>
+          <a class="btn btn-secondary" href="#estimate" onclick="go('estimate');return false">Continue estimate</a>
+        </div>
+      </div>
+
+      <div class="card mt-lg">
+        <div class="card-head" style="flex-wrap:wrap">
+          <h2>Estimation requests</h2>
+          <div class="seg" role="group" aria-label="Filter by status">
+            <button type="button" aria-pressed="true" onclick="segPick(this)">All</button>
+            <button type="button" aria-pressed="false" onclick="segPick(this)">Mine</button>
+            <button type="button" aria-pressed="false" onclick="segPick(this)">In review</button>
+            <button type="button" aria-pressed="false" onclick="segPick(this)">Approved</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Project</th><th>Status</th><th>Owner</th><th>Parts</th><th class="r">Hours (min–max)</th><th>Updated</th><th><span class="sr-only">Open</span></th></tr></thead>
+            <tbody>
+              <tr><td><div class="row-title">Patient portal MVP</div><div class="row-sub">Northwind Clinics</div></td><td><span class="badge b-draft"><span class="dot"></span>Draft</span></td><td>Umair K.</td><td>Web · Backend · Mobile</td><td class="r num">412–538</td><td class="muted">12 min ago</td><td><a href="#estimate" onclick="go('estimate');return false">Open</a></td></tr>
+              <tr><td><div class="row-title">Fleet tracking dashboard</div><div class="row-sub">Contoso Logistics</div></td><td><span class="badge b-review"><span class="dot"></span>In review</span></td><td>Sara A.</td><td>Web · Backend · Cloud</td><td class="r num">286–364</td><td class="muted">Yesterday</td><td><a href="#review" onclick="go('review');return false">Review</a></td></tr>
+              <tr><td><div class="row-title">Course marketplace</div><div class="row-sub">BrightPath Learning</div></td><td><span class="badge b-changes"><span class="dot"></span>Changes requested</span></td><td>Bilal R.</td><td>Web · Admin</td><td class="r num">198–254</td><td class="muted">2 days ago</td><td><a href="#estimate" onclick="go('estimate');return false">Open</a></td></tr>
+              <tr><td><div class="row-title">Field service app</div><div class="row-sub">Fabrikam Energy</div></td><td><span class="badge b-approved"><span class="dot"></span>Approved</span></td><td>Umair K.</td><td>Mobile · Backend</td><td class="r num">344–420</td><td class="muted">Oct 26</td><td><a href="#export" onclick="go('export');return false">Export</a></td></tr>
+              <tr><td><div class="row-title">AI document assistant</div><div class="row-sub">Tailspin Legal</div></td><td><span class="badge b-exported"><span class="dot"></span>Exported</span></td><td>Hina M.</td><td>Web · Backend</td><td class="r num">156–204</td><td class="muted">Oct 22</td><td><a href="#export" onclick="go('export');return false">View</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ NEW REQUEST WIZARD ============ -->
+    <section id="screen-new" class="screen" aria-labelledby="new-title">
+      <div class="content">
+        <div class="page-head"><div><h1 id="new-title">New estimation request</h1><p>Four short steps. Everything is saved as a draft as you go, so you can leave and come back.</p></div></div>
+        <nav class="stepper" aria-label="Progress"><ol>
+          <li class="done">Project</li><li class="done">Platforms &amp; stack</li><li class="done">Environment &amp; compliance</li><li class="current" aria-current="step">Requirements</li>
+        </ol></nav>
+        <div class="split">
+          <div class="vstack">
+            <div class="card card-pad vstack">
+              <div><h2>Upload the client's requirements</h2><p class="muted small" style="margin-top:4px">PDF for client RFPs and specs, Word (.docx) for Folio3 SOWs. The AI proposes features, assumptions and client questions; nothing is added until you confirm.</p></div>
+              <div class="dropzone"><svg><use href="#i-upload"/></svg><p style="font-weight:600;margin-top:6px">Drag files here or <a href="#" onclick="toast('File picker opens');return false">browse</a></p><p class="small muted">PDF or DOCX · up to 25 MB each</p></div>
+              <div class="file-row"><div class="file-icon f-pdf">PDF</div><div style="flex:1;min-width:0"><div class="row-title">Northwind_Patient_Portal_RFP.pdf</div><div class="row-sub">Client requirements · 18 pages · read in 41 s</div></div><span class="badge b-approved">Read</span></div>
+              <div class="alert alert-ok"><svg><use href="#i-check"/></svg><span><strong>24 features found</strong> across Web, Backend and Mobile, plus 6 assumptions and 5 questions for the client. 3 items need your confirmation.</span></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>Proposed features</h2><div class="hstack"><button class="btn btn-ghost btn-sm" type="button" onclick="toast('All 21 confident items accepted · Undo available')">Accept all confident (21)</button></div></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Feature</th><th>Part</th><th>Source in document</th><th class="r">Decision</th></tr></thead>
+                <tbody>
+                  <tr><td><div class="row-title">Patient sign up &amp; sign in</div><div class="row-sub">Email + Google sign-in, forgot password</div></td><td>Web, Mobile</td><td><div class="quote">"Patients must be able to register with email or Google…" <span class="muted">· p. 4</span></div></td><td><div class="actions"><button class="btn btn-secondary btn-sm" type="button" onclick="decide(this,'accept')">Accept</button><button class="btn btn-ghost btn-sm" type="button" onclick="decide(this,'reject')">Remove</button></div></td></tr>
+                  <tr><td><div class="row-title">Appointment booking</div><div class="row-sub">Doctor availability, reminders</div></td><td>Web, Backend</td><td><div class="quote">"…book, reschedule and cancel appointments online." <span class="muted">· p. 6</span></div></td><td><div class="actions"><button class="btn btn-secondary btn-sm" type="button" onclick="decide(this,'accept')">Accept</button><button class="btn btn-ghost btn-sm" type="button" onclick="decide(this,'reject')">Remove</button></div></td></tr>
+                  <tr><td><div class="row-title">Video consultation <span class="badge b-changes">Needs confirmation</span></div><div class="row-sub">Unclear if in MVP scope</div></td><td>Web, Mobile</td><td><div class="quote">"Video visits may be added in a later phase." <span class="muted">· p. 11</span></div></td><td><div class="actions"><button class="btn btn-secondary btn-sm" type="button" onclick="decide(this,'accept')">Accept</button><button class="btn btn-ghost btn-sm" type="button" onclick="decide(this,'reject')">Remove</button></div></td></tr>
+                </tbody>
+              </table></div>
+              <div class="card-pad"><button class="btn btn-ghost btn-sm" type="button" onclick="toast('Blank feature row added')"><svg><use href="#i-plus"/></svg>Add a feature the document missed</button></div>
+            </div>
+          </div>
+
+          <aside class="card card-pad vstack" aria-label="Request summary">
+            <h2>Request summary</h2>
+            <dl class="kv" style="grid-template-columns:110px 1fr">
+              <dt>Client</dt><dd>Northwind Clinics</dd>
+              <dt>Project</dt><dd>Patient portal MVP</dd>
+              <dt>Parts</dt><dd>Web (React) · Backend (Node.js) · Mobile (React Native)</dd>
+              <dt>Deployment</dt><dd>Client AWS · staging + production</dd>
+              <dt>Compliance</dt><dd><span class="badge b-review">HIPAA</span> <span class="badge b-review">WCAG AA</span></dd>
+              <dt>Team</dt><dd>Mixed experience</dd>
+            </dl>
+            <div class="alert alert-info"><svg><use href="#i-info"/></svg><span>HIPAA adds 3 suggested items (audit log, encryption at rest, BAA process). You'll see them in the estimate.</span></div>
+            <a href="#" class="small" onclick="toast('Back to step 3');return false">Edit earlier steps</a>
+          </aside>
+        </div>
+      </div>
+      <div class="footer-bar">
+        <span class="muted small">Draft saved automatically · 2 minutes ago</span>
+        <div class="hstack"><button class="btn btn-ghost" type="button" onclick="go('home')">Save &amp; exit</button><button class="btn btn-secondary" type="button" onclick="toast('Back to step 3')">Back</button><button class="btn btn-primary" type="button" onclick="go('estimate'); toast('Matching 24 features against 142 past projects…')">Match features &amp; estimate</button></div>
+      </div>
+    </section>
+
+    <!-- ============ ESTIMATE WORKSPACE ============ -->
+    <section id="screen-estimate" class="screen" aria-labelledby="est-title">
+      <div class="content">
+        <div class="page-head">
+          <div><div class="hstack"><h1 id="est-title">Patient portal MVP</h1><span class="badge b-draft"><span class="dot"></span>Draft</span></div><p>Northwind Clinics · Review each suggestion. Every number shows its source; click a source to see the evidence.</p></div>
+          <div class="hstack">
+            <span class="small muted">Team experience <span class="help-tip" title="Experienced: estimate sits at the minimum. Junior: leans to the maximum. A Folio3 decision per request." tabindex="0">?</span></span>
+            <div class="seg" role="group" aria-label="Team experience">
+              <button type="button" aria-pressed="false" onclick="setTeam(this,'exp')">Experienced</button>
+              <button type="button" aria-pressed="true" onclick="setTeam(this,'mixed')">Mixed</button>
+              <button type="button" aria-pressed="false" onclick="setTeam(this,'jr')">Junior</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="vstack">
+            <div class="legend" aria-label="Source legend">
+              <span><span class="source s-bench">Benchmark</span> real AI-era hours, Architect-confirmed</span>
+              <span><span class="source s-hist">Past project</span> similar past estimate, AI-reduced</span>
+              <span><span class="source s-ai">AI guess</span> no reliable match: check it</span>
+            </div>
+            <div class="card">
+              <div class="tabs" role="tablist" aria-label="Parts" style="padding:0 12px;margin:0">
+                <button role="tab" aria-selected="true" type="button">Web (React) · 14</button>
+                <button role="tab" aria-selected="false" type="button" onclick="toast('Backend (Node.js) · 7 features')">Backend (Node.js) · 7</button>
+                <button role="tab" aria-selected="false" type="button" onclick="toast('Mobile (React Native) · 3 features')">Mobile (RN) · 3</button>
+              </div>
+              <div class="table-wrap"><table id="est-table">
+                <thead><tr><th>Feature / sub task</th><th>Source</th><th class="r">Hours</th><th class="r">Decision</th></tr></thead>
+                <tbody></tbody>
+              </table></div>
+              <div class="card-pad hstack" style="justify-content:space-between">
+                <button class="btn btn-ghost btn-sm" type="button" onclick="toast('Feature picker opens (166 features in the library)')"><svg><use href="#i-plus"/></svg>Add from feature library</button>
+                <span class="small muted" id="reviewed-count">5 of 8 reviewed</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="totals vstack" aria-label="Estimate totals">
+            <div class="card card-pad vstack">
+              <div class="hstack" style="justify-content:space-between"><h2>Totals</h2><span class="small muted">updates live</span></div>
+              <dl>
+                <dt>Development</dt><dd id="t-dev">–</dd>
+                <dt>Bug fixing <span class="muted">10%</span></dt><dd id="t-bug">–</dd>
+                <dt>QA <span class="muted">25%</span></dt><dd id="t-qa">–</dd>
+                <dt>PM <span class="muted">30%</span></dt><dd id="t-pm">–</dd>
+                <dt class="sum">Total hours</dt><dd class="sum" id="t-total">–</dd>
+              </dl>
+              <div class="field"><label for="rate">Hourly rate</label>
+                <select id="rate" class="input" onchange="recalc()"><option>25</option><option selected>30</option><option>35</option><option>40</option><option>45</option><option>50</option></select>
+                <span class="help">Default $30 · confirm the approved rate before export</span></div>
+              <div><div class="small muted">Estimated cost</div><div class="cost num" id="t-cost">–</div></div>
+            </div>
+            <div class="card card-pad">
+              <h3>Before you submit</h3>
+              <div class="mt">
+                <div class="check"><span class="ic ic-ok">✓</span><span>All parts have a stack</span></div>
+                <div class="check"><span class="ic ic-warn">!</span><span><strong>3 suggestions</strong> not reviewed yet</span></div>
+                <div class="check"><span class="ic ic-warn">!</span><span><strong>1 AI guess</strong> without a past reference</span></div>
+                <div class="check"><span class="ic ic-warn">!</span><span>Hourly rate still the default</span></div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-lg" type="button" onclick="go('review'); toast('Submitted to Ahmed (Architect) for review')">Submit for review</button>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REVIEW & APPROVAL ============ -->
+    <section id="screen-review" class="screen content" aria-labelledby="rev-title">
+      <div class="page-head">
+        <div><div class="hstack"><h1 id="rev-title">Review: Fleet tracking dashboard</h1><span class="badge b-review"><span class="dot"></span>In review</span></div><p>Submitted by Sara A. yesterday · You're reviewing as <strong>Architect</strong>. Only Tech Leads and Architects can approve.</p></div>
+        <div class="hstack"><button class="btn btn-secondary" type="button" onclick="toast('Comment required: tell Sara what to change')">Request changes</button><button class="btn btn-primary" type="button" onclick="go('export'); toast('Approved. The estimate is now locked and added to the knowledge base.')">Approve estimate</button></div>
+      </div>
+      <div class="grid cols-4">
+        <div class="card card-pad stat"><div class="label">Total hours</div><div class="value num">286–364</div><div class="hint">Dev + 10% bugs + QA 25% + PM 30%</div></div>
+        <div class="card card-pad stat"><div class="label">From benchmarks</div><div class="value num">58%</div><div class="hint">of development hours</div></div>
+        <div class="card card-pad stat"><div class="label">AI guesses</div><div class="value num" style="color:var(--ai)">2</div><div class="hint">no past reference</div></div>
+        <div class="card card-pad stat"><div class="label">Large overrides</div><div class="value num" style="color:var(--warn)">1</div><div class="hint">changed &gt; 30% from suggestion</div></div>
+      </div>
+      <div class="split mt-lg">
+        <div class="card">
+          <div class="card-head"><h2>Needs your attention</h2><span class="small muted">3 of 31 sub tasks</span></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Sub task</th><th>Why flagged</th><th class="r">Hours</th></tr></thead>
+            <tbody>
+              <tr><td><div class="row-title">Live vehicle map with clustering</div><div class="row-sub">Web · Maps</div></td><td><span class="source s-ai">AI guess</span><div class="row-sub">No similar feature in 142 projects</div></td><td class="r hours">18–26</td></tr>
+              <tr><td><div class="row-title">Route replay (history slider)</div><div class="row-sub">Web · Maps</div></td><td><span class="source s-ai">AI guess</span><div class="row-sub">No similar feature in 142 projects</div></td><td class="r hours">10–14</td></tr>
+              <tr><td><div class="row-title">Geofence alerts</div><div class="row-sub">Backend · Notifications</div></td><td><span class="badge b-changes">Override +45%</span><div class="row-sub">"Client wants SMS + email + push" — Sara</div></td><td class="r hours">12–16 <span class="was">8–11</span></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <aside class="card card-pad vstack" aria-label="Comments">
+          <h2>Comments</h2>
+          <div class="comment"><div class="avatar" style="background:#E8EEFD;color:#1D4ED8" aria-hidden="true">SA</div><div class="bubble"><strong>Sara A.</strong> · yesterday<br>Map features are new for us, so I left the AI guesses in. Happy to adjust.</div></div>
+          <div class="field"><label for="rev-comment">Add a comment</label><textarea id="rev-comment" class="input" placeholder="Required when requesting changes"></textarea></div>
+          <button class="btn btn-secondary btn-sm" type="button" style="align-self:flex-start" onclick="toast('Comment posted · Sara notified')">Post comment</button>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ EXPORT ============ -->
+    <section id="screen-export" class="screen content" aria-labelledby="exp-title">
+      <div class="page-head"><div><div class="hstack"><h1 id="exp-title">Export: Field service app</h1><span class="badge b-approved"><span class="dot"></span>Approved</span></div><p>Fills Folio3's estimation template (v0.5). Only what's needed is included; formulas stay live in Excel.</p></div></div>
+      <div class="split">
+        <div class="vstack">
+          <div class="card card-pad vstack">
+            <h2>Who is it for?</h2>
+            <div class="seg" role="group" aria-label="Export type">
+              <button type="button" aria-pressed="true" onclick="segPick(this); toast('Client export: no internal references, price only if ticked')">Client</button>
+              <button type="button" aria-pressed="false" onclick="segPick(this); toast('Internal export: includes sources, AI reduction and price')">Internal</button>
+            </div>
+            <div>
+              <div class="toggle-row"><div><div class="row-title">Development sheets</div><div class="row-sub">Mobile (React Native), Backend (Node.js) · always included</div></div><span class="badge b-approved">Included</span></div>
+              <div class="toggle-row"><div><div class="row-title">QA and PM rows on the Summary</div><div class="row-sub">QA 25% · PM 30% of development</div></div><label class="switch"><input type="checkbox" checked aria-label="Include QA and PM rows"><span></span></label></div>
+              <div class="toggle-row"><div><div class="row-title">Price block</div><div class="row-sub">Total hours × $35/h (approved rate)</div></div><label class="switch"><input type="checkbox" aria-label="Show price to client"><span></span></label></div>
+              <div class="toggle-row"><div><div class="row-title">Questions for the client</div><div class="row-sub">5 open questions</div></div><label class="switch"><input type="checkbox" checked aria-label="Include questions sheet"><span></span></label></div>
+              <div class="toggle-row"><div><div class="row-title">Graphic design sheet</div><div class="row-sub">Off: design not in scope</div></div><label class="switch"><input type="checkbox" aria-label="Include design sheet"><span></span></label></div>
+            </div>
+            <p class="small muted">Resources and timeline columns are left blank: the PM plans those after the estimate.</p>
+          </div>
+        </div>
+        <aside class="card card-pad vstack" aria-label="Export checklist">
+          <h2>Ready to export</h2>
+          <div>
+            <div class="check"><span class="ic ic-ok">✓</span><span>Approved by Ahmed (Architect)</span></div>
+            <div class="check"><span class="ic ic-ok">✓</span><span>All totals are formulas</span></div>
+            <div class="check"><span class="ic ic-ok">✓</span><span>No Min greater than Max</span></div>
+            <div class="check"><span class="ic ic-ok">✓</span><span>Approved rate confirmed ($35/h)</span></div>
+            <div class="check"><span class="ic ic-ok">✓</span><span>No text copied from other projects</span></div>
+          </div>
+          <button class="btn btn-primary btn-lg" type="button" onclick="toast('Field_service_app_estimate.xlsx downloaded ✓')"><svg><use href="#i-download"/></svg>Download Excel</button>
+          <p class="small muted">File name: Fabrikam_Field_service_app_v2.xlsx</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ IMPORT ============ -->
+    <section id="screen-import" class="screen content" aria-labelledby="imp-title">
+      <div class="page-head"><div><h1 id="imp-title">Import past projects</h1><p>Load past estimates (and their actual hours, if delivered) so matching has history to search. Nothing becomes searchable until you approve the preview.</p></div></div>
+      <div class="card card-pad vstack">
+        <div class="dropzone"><svg><use href="#i-upload"/></svg><p style="font-weight:600;margin-top:6px">Drop estimate files or a .zip with one folder per project</p><p class="small muted">Name actual-hours files <code>…-actuals.xlsx</code> · same-name files from different people are kept apart</p></div>
+        <div class="hstack" style="justify-content:space-between"><h2>Batch from today · 4 files</h2><span class="small muted">Uploaded by Umair K. · 10:42</span></div>
+        <div class="file-row"><div class="file-icon f-xlsx">XLS</div><div style="flex:1;min-width:0"><div class="row-title">Sample B · Web + Node + React Native</div><div class="row-sub">3 parts · 150 sub tasks · estimate + actuals</div></div><span class="badge b-approved">Ready</span><button class="btn btn-secondary btn-sm" type="button" onclick="toast('Preview opens')">Preview</button></div>
+        <div class="file-row"><div class="file-icon f-xlsx">XLS</div><div style="flex:1;min-width:0"><div class="row-title">Sample A · Web calculator</div><div class="row-sub">2 parts · 55 sub tasks</div></div><span class="badge b-changes">2 warnings</span><button class="btn btn-secondary btn-sm" type="button" onclick="toast('Preview opens at the warnings')">Review</button></div>
+        <div class="alert alert-warn"><svg><use href="#i-alert"/></svg><span><strong>Totals don't match:</strong> "BackEnd" sheet says 26–34 h, but its sub tasks add up to 166–254 h. The tool will use the sub-task total.</span></div>
+        <div class="file-row"><div class="file-icon f-xlsx">XLS</div><div style="flex:1;min-width:0"><div class="row-title">Estimation_Sheet.xlsx</div><div class="row-sub">Unfilled template · no tasks found</div></div><span class="badge b-err">No data</span><button class="btn btn-ghost btn-sm" type="button" onclick="toast('Skipped')">Skip</button></div>
+        <div class="file-row"><div class="file-icon f-xlsx">XLS</div><div style="flex:1;min-width:0"><div class="row-title">Bitdeer_Estimation_Sheet.xlsx <span class="muted small">(2)</span></div><div class="row-sub">Same content as an import from Oct 28 by Sara A.</div></div><span class="badge b-draft">Duplicate</span><button class="btn btn-ghost btn-sm" type="button" onclick="toast('Kept both as versions')">Keep both</button></div>
+        <div class="hstack" style="justify-content:flex-end"><button class="btn btn-secondary" type="button" onclick="toast('Batch saved as draft')">Save for later</button><button class="btn btn-primary" type="button" onclick="toast('2 projects added to the knowledge base')">Approve 2 ready projects</button></div>
+      </div>
+    </section>
+
+    <!-- ============ ACTUAL HOURS ============ -->
+    <section id="screen-actuals" class="screen content" aria-labelledby="act-title">
+      <div class="page-head"><div><div class="hstack"><h1 id="act-title">Actual hours: Field service app</h1><span class="badge b-approved">Won · In delivery</span></div><p>Architects and Tech Leads record what the work really took. These hours update the feature benchmarks, so future estimates get more accurate.</p></div>
+        <div class="hstack"><button class="btn btn-secondary" type="button" onclick="toast('Upload the filled-in estimate Excel')"><svg><use href="#i-upload"/></svg>Upload actuals Excel</button><button class="btn btn-primary" type="button" onclick="toast('Marked Delivered · actual hours locked')">Mark delivered</button></div></div>
+      <div class="grid cols-3">
+        <div class="card card-pad stat"><div class="label">Matched</div><div class="value num">27</div><div class="hint">estimate vs actual</div></div>
+        <div class="card card-pad stat"><div class="label">Unplanned work</div><div class="value num" style="color:var(--warn)">3</div><div class="hint">not in the estimate · 22 h</div></div>
+        <div class="card card-pad stat"><div class="label">Overall variance</div><div class="value num diff-down">−12%</div><div class="hint">actual below estimated max</div></div>
+      </div>
+      <div class="card mt-lg"><div class="table-wrap"><table>
+        <thead><tr><th>Sub task</th><th>Status</th><th class="r">Estimated</th><th class="r">Actual</th><th class="r">Variance</th></tr></thead>
+        <tbody>
+          <tr><td><div class="row-title">Sign in (form + validation)</div><div class="row-sub">Mobile · linked to FB-015</div></td><td><span class="badge b-approved">Matched</span></td><td class="r num">6–8</td><td class="r"><input class="input num" style="width:80px;min-height:34px;text-align:right" value="4" aria-label="Actual hours for sign in"></td><td class="r diff-down">−33%</td></tr>
+          <tr><td><div class="row-title">Offline job sync</div><div class="row-sub">Mobile</div></td><td><span class="badge b-approved">Matched</span></td><td class="r num">16–22</td><td class="r"><input class="input num" style="width:80px;min-height:34px;text-align:right" value="27" aria-label="Actual hours for offline sync"></td><td class="r diff-up">+23%</td></tr>
+          <tr><td><div class="row-title">Barcode scanning of parts</div><div class="row-sub">Mobile · added during delivery</div></td><td><span class="badge b-changes">Unplanned</span></td><td class="r muted">–</td><td class="r num">9</td><td class="r muted">–</td></tr>
+          <tr><td><div class="row-title">Technician chat</div><div class="row-sub">Mobile</div></td><td><span class="badge b-draft">Dropped</span></td><td class="r num">10–14</td><td class="r muted">not built</td><td class="r muted">–</td></tr>
+        </tbody>
+      </table></div></div>
+    </section>
+
+    <!-- ============ FEATURE BENCHMARKS ============ -->
+    <section id="screen-benchmarks" class="screen content" aria-labelledby="bm-title">
+      <div class="page-head"><div><h1 id="bm-title">Feature hours</h1><p>What common features really take with AI. Confirmed hours are suggested first in every estimate and keep learning from delivered projects.</p></div>
+        <div class="hstack"><button class="btn btn-secondary" type="button" onclick="toast('Import the filled-in survey (xlsx or csv)')"><svg><use href="#i-upload"/></svg>Import survey</button><button class="btn btn-primary" type="button" onclick="toast('New feature row')"><svg><use href="#i-plus"/></svg>Add feature</button></div></div>
+      <div class="alert alert-info"><svg><use href="#i-info"/></svg><span><strong>4 changes waiting for an Architect:</strong> recent actual hours would move these benchmarks by more than 15%. <a href="#" onclick="toast('Opens the 4 proposed changes');return false">Review changes</a></span></div>
+      <div class="card mt-lg">
+        <div class="card-head" style="flex-wrap:wrap">
+          <div class="seg" role="group" aria-label="Part"><button type="button" aria-pressed="true" onclick="segPick(this)">All parts</button><button type="button" aria-pressed="false" onclick="segPick(this)">Web</button><button type="button" aria-pressed="false" onclick="segPick(this)">Backend</button><button type="button" aria-pressed="false" onclick="segPick(this)">Mobile</button></div>
+          <span class="small muted">166 features · 61 confirmed</span>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Feature</th><th>Part</th><th class="r">Pre-AI estimate</th><th class="r">With AI (exp. – junior)</th><th>Trend</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><div class="row-title">FB-012 · Sign up (form + validation)</div><div class="row-sub">User Management · React</div></td><td>Web</td><td class="r num muted">10–12</td><td class="r hours">4–6</td><td><svg class="spark" viewBox="0 0 120 32" aria-label="Trend: from 11 to 5 hours"><polyline points="0,6 30,10 60,16 90,22 120,25" fill="none" stroke="var(--ok)" stroke-width="2.5"/></svg></td><td><span class="badge b-approved">Confirmed · 4 projects</span></td></tr>
+            <tr><td><div class="row-title">FB-039 · Stripe subscriptions</div><div class="row-sub">Payments · Node.js</div></td><td>Backend</td><td class="r num muted">16–20</td><td class="r hours">9–12</td><td><svg class="spark" viewBox="0 0 120 32" aria-label="Trend: from 18 to 10 hours"><polyline points="0,5 40,9 80,17 120,21" fill="none" stroke="var(--ok)" stroke-width="2.5"/></svg></td><td><span class="badge b-approved">Confirmed · 3 projects</span></td></tr>
+            <tr><td><div class="row-title">FB-034 · WebSocket messaging setup</div><div class="row-sub">Real-time Chat · React</div></td><td>Web</td><td class="r num muted">8–10</td><td class="r hours">5–7</td><td><svg class="spark" viewBox="0 0 120 32" aria-label="Trend: from 9 to 6 hours"><polyline points="0,8 60,14 120,18" fill="none" stroke="var(--ok)" stroke-width="2.5"/></svg></td><td><span class="badge b-changes">Change proposed</span></td></tr>
+            <tr><td><div class="row-title">FB-120 · Chat over documents (RAG)</div><div class="row-sub">AI Features · Any</div></td><td>Backend</td><td class="r num muted">–</td><td class="r muted">not yet</td><td class="muted small">no data</td><td><span class="badge b-draft">Needs hours</span></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section id="screen-admin" class="screen content" aria-labelledby="adm-title">
+      <div class="page-head"><div><h1 id="adm-title">Settings</h1><p>Defaults every estimate starts from. Estimators can change them per request; changes here apply to new requests only.</p></div></div>
+      <div class="grid cols-2">
+        <div class="card card-pad vstack">
+          <h2>Percentages</h2>
+          <div class="grid cols-3">
+            <div class="field"><label for="s-bug">Bug fixing</label><input id="s-bug" class="input num" value="10%"></div>
+            <div class="field"><label for="s-qa">QA</label><input id="s-qa" class="input num" value="25%"></div>
+            <div class="field"><label for="s-pm">PM</label><input id="s-pm" class="input num" value="30%"></div>
+          </div>
+          <p class="small muted">Of total development hours. Last changed Oct 29 by Umair K.</p>
+        </div>
+        <div class="card card-pad vstack">
+          <h2>Hourly rates (USD)</h2>
+          <div class="chips" role="group" aria-label="Approved rates">
+            <button class="chip" type="button" aria-pressed="true">$25</button><button class="chip" type="button" aria-pressed="true">$30 · default</button><button class="chip" type="button" aria-pressed="true">$35</button><button class="chip" type="button" aria-pressed="true">$40</button><button class="chip" type="button" aria-pressed="true">$45</button><button class="chip" type="button" aria-pressed="true">$50</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" style="align-self:flex-start" onclick="toast('Add rate')"><svg><use href="#i-plus"/></svg>Add rate</button>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-head"><h2>People and roles</h2><button class="btn btn-secondary btn-sm" type="button" onclick="toast('Invite by @folio3.com email')">Invite</button></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Role</th><th>Can approve</th><th>Last active</th></tr></thead>
+            <tbody>
+              <tr><td><div class="row-title">Umair Khan</div><div class="row-sub">khanumair@folio3.com</div></td><td><select class="input" style="min-height:34px;width:160px" aria-label="Role for Umair Khan"><option>Admin</option></select></td><td class="muted">No</td><td class="muted">Now</td></tr>
+              <tr><td><div class="row-title">Ahmed S.</div><div class="row-sub">Architect</div></td><td><select class="input" style="min-height:34px;width:160px" aria-label="Role for Ahmed S."><option>Architect</option></select></td><td><span class="badge b-approved">Yes</span></td><td class="muted">1 h ago</td></tr>
+              <tr><td><div class="row-title">Sara A.</div><div class="row-sub">Project Manager</div></td><td><select class="input" style="min-height:34px;width:160px" aria-label="Role for Sara A."><option>Estimator</option></select></td><td class="muted">No</td><td class="muted">Yesterday</td></tr>
+              <tr><td><div class="row-title">New sign-in: hina.m@folio3.com</div><div class="row-sub">Signed in today, no role yet</div></td><td><select class="input" style="min-height:34px;width:160px" aria-label="Role for new user"><option>Choose a role…</option><option>Estimator</option><option>Tech Lead</option><option>Architect</option></select></td><td class="muted">–</td><td class="muted">Today</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 404 (example state) ============ -->
+    <section id="screen-notfound" class="screen content" aria-labelledby="nf-title">
+      <div class="card card-pad empty" style="max-width:520px;margin:40px auto">
+        <svg><use href="#i-search"/></svg>
+        <h1 id="nf-title" style="font-size:22px;color:var(--ink)">Page not found</h1>
+        <p class="mt">The page you're looking for doesn't exist or was moved.</p>
+        <a class="btn btn-primary mt" href="#home" onclick="go('home');return false">Go to the home page</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Evidence drawer -->
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">
+  <div class="drawer-head">
+    <div><div class="small muted">Why this number?</div><h2 id="drawer-title">Sign up (form + validation)</h2></div>
+    <button class="icon-btn" type="button" aria-label="Close" onclick="closeDrawer()"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><button type="button" id="toast-undo" onclick="undo()">Undo</button></div>
+
+<script>
+// ---------- Demo data (fictional) ----------
+const rows = [
+  { group: 'User Management' },
+  { id: 1, name: 'Sign up (form + validation)', part: 'Web', src: 'bench', ref: 'FB-012', exp: 4, jr: 6, pre: [10, 12], decision: 'accepted' },
+  { id: 2, name: 'Sign in + Google sign-in', part: 'Web', src: 'bench', ref: 'FB-015 + FB-064', exp: 5, jr: 8, pre: [10, 14], decision: 'accepted' },
+  { id: 3, name: 'Forgot password (form + API)', part: 'Web', src: 'hist', ref: 'Sample B · Web, row 26', exp: 4, jr: 6, pre: [6, 10], decision: null },
+  { group: 'Appointments' },
+  { id: 4, name: 'Booking calendar with availability', part: 'Web', src: 'hist', ref: 'Sample A · UI, row 17', exp: 14, jr: 20, pre: [24, 32], decision: 'accepted' },
+  { id: 5, name: 'Reminder notifications (email + SMS)', part: 'Web', src: 'bench', ref: 'FB-089 + FB-094', exp: 4, jr: 7, pre: [8, 12], decision: 'accepted' },
+  { id: 6, name: 'Video consultation room', part: 'Web', src: 'ai', ref: null, exp: 18, jr: 28, pre: null, decision: null },
+  { group: 'Compliance (HIPAA)' },
+  { id: 7, name: 'Audit log viewer', part: 'Web', src: 'bench', ref: 'FB-044', exp: 8, jr: 12, pre: [15, 20], decision: 'accepted' },
+  { id: 8, name: 'Accessibility pass (WCAG AA)', part: 'Web', src: 'hist', ref: 'Sample B · Web, row 72', exp: 10, jr: 14, pre: [16, 20], decision: null },
+];
+let team = 'mixed';
+let lastAction = null;
+
+const srcLabel = { bench: ['s-bench', 'Benchmark'], hist: ['s-hist', 'Past project'], ai: ['s-ai', 'AI guess'], manual: ['s-manual', 'Manual'] };
+function range(r) {
+  if (team === 'exp') return [r.exp, Math.round(r.exp * 1.15)];
+  if (team === 'jr') return [Math.round((r.exp + r.jr) / 2), r.jr];
+  return [r.exp, r.jr];
+}
+function renderTable() {
+  const tb = document.querySelector('#est-table tbody');
+  tb.innerHTML = rows.map(r => {
+    if (r.group) return `<tr class="group-row"><td colspan="4">${r.group}</td></tr>`;
+    const [cls, label] = srcLabel[r.src];
+    const [mn, mx] = range(r);
+    const was = r.pre ? `<span class="was" title="Pre-AI estimate">${r.pre[0]}–${r.pre[1]}</span>` : '';
+    const rowCls = r.decision === 'accepted' ? 'row-accepted' : r.decision === 'rejected' ? 'row-rejected' : '';
+    const decision = r.decision === 'accepted'
+      ? `<span class="badge b-approved">✓ Accepted</span><button class="btn btn-ghost btn-sm" type="button" onclick="setDecision(${r.id}, null)">Change</button>`
+      : r.decision === 'rejected'
+        ? `<span class="badge b-draft">Removed</span><button class="btn btn-ghost btn-sm" type="button" onclick="setDecision(${r.id}, null)">Restore</button>`
+        : `<button class="btn btn-secondary btn-sm" type="button" onclick="setDecision(${r.id}, 'accepted')">Accept</button><button class="btn btn-ghost btn-sm" type="button" onclick="toast('Adjust: type new hours and a short reason')"><svg><use href="#i-edit"/></svg><span class="sr-only">Adjust</span></button><button class="btn btn-ghost btn-sm" type="button" onclick="setDecision(${r.id}, 'rejected')">Remove</button>`;
+    return `<tr class="${rowCls}">
+      <td><div class="row-title">${r.name}</div><div class="row-sub">${r.part}${r.src === 'ai' ? ' · <strong style="color:var(--ai)">check this one</strong>' : ''}</div></td>
+      <td><button class="source ${cls}" type="button" onclick="openDrawer(${r.id})" aria-label="${label}${r.ref ? ': ' + r.ref : ''}. Show evidence">${r.src === 'ai' ? '<svg width="12" height="12"><use href="#i-sparkle"/></svg>' : ''}${label}</button>${r.ref ? `<div class="row-sub">${r.ref}</div>` : ''}</td>
+      <td class="r"><span class="hours">${mn}–${mx}</span>${was}</td>
+      <td class="r"><div class="actions">${decision}</div></td></tr>`;
+  }).join('');
+  const items = rows.filter(r => !r.group);
+  document.getElementById('reviewed-count').textContent = `${items.filter(r => r.decision).length} of ${items.length} reviewed`;
+  recalc();
+}
+function recalc() {
+  const live = rows.filter(r => !r.group && r.decision !== 'rejected');
+  const dev = live.reduce((a, r) => { const [mn, mx] = range(r); return [a[0] + mn, a[1] + mx]; }, [0, 0]);
+  const pct = (p) => dev.map(v => Math.round(v * p));
+  const bug = pct(0.10), qa = pct(0.25), pm = pct(0.30);
+  const total = dev.map((v, i) => v + bug[i] + qa[i] + pm[i]);
+  const rate = +document.getElementById('rate').value;
+  const f = (a) => `${a[0]}–${a[1]} h`;
+  document.getElementById('t-dev').textContent = f(dev);
+  document.getElementById('t-bug').textContent = f(bug);
+  document.getElementById('t-qa').textContent = f(qa);
+  document.getElementById('t-pm').textContent = f(pm);
+  document.getElementById('t-total').textContent = f(total);
+  document.getElementById('t-cost').textContent = `$${(total[0] * rate).toLocaleString()} – $${(total[1] * rate).toLocaleString()}`;
+}
+function setDecision(id, d) {
+  const r = rows.find(x => x.id === id); const prev = r.decision; r.decision = d; renderTable();
+  lastAction = () => { r.decision = prev; renderTable(); };
+  toast(d === 'accepted' ? `Accepted "${r.name}"` : d === 'rejected' ? `Removed "${r.name}"` : `"${r.name}" is back to review`, true);
+}
+function setTeam(btn, t) { segPick(btn); team = t; renderTable(); toast(t === 'exp' ? 'Experienced team: estimates sit at the minimum' : t === 'jr' ? 'Junior team: estimates lean to the maximum' : 'Mixed team: full min–max range'); }
+
+// ---------- Evidence drawer ----------
+function openDrawer(id) {
+  const r = rows.find(x => x.id === id); const [mn, mx] = range(r);
+  document.getElementById('drawer-title').textContent = r.name;
+  const body = document.getElementById('drawer-body');
+  if (r.src === 'ai') {
+    body.innerHTML = `<div class="alert alert-warn"><svg><use href="#i-alert"/></svg><span><strong>No reliable match.</strong> The closest past feature was only 41% similar, so this is an AI first guess (${mn}–${mx} h). Please check it or ask a Tech Lead.</span></div>
+      <div class="match"><div class="hstack" style="justify-content:space-between"><strong>Technician video call (Sample C)</strong><span class="sim">41% similar</span></div><div class="bar"><span style="width:41%;background:var(--warn)"></span></div><div class="small muted">Different scope: one-to-one support calls, no scheduling or waiting room.</div></div>
+      <div class="field"><label for="ai-hours">Your estimate</label><div class="hstack"><input id="ai-hours" class="input num" style="width:90px" value="${mn}" aria-label="Minimum hours"> – <input class="input num" style="width:90px" value="${mx}" aria-label="Maximum hours"> h</div><span class="help">Saved as Manual, with your name</span></div>`;
+  } else {
+    const best = r.src === 'bench'
+      ? `<div class="match best"><div class="hstack" style="justify-content:space-between"><strong>Benchmark ${r.ref}</strong><span class="badge b-approved">Used</span></div><div class="small">With AI: <strong>${r.exp} h</strong> experienced · <strong>${r.jr} h</strong> junior · confirmed by Ahmed S. (Architect) · based on 4 projects · updated Sep 2026</div><div class="small muted">Pre-AI estimate was ${r.pre[0]}–${r.pre[1]} h</div></div>`
+      : `<div class="match best"><div class="hstack" style="justify-content:space-between"><strong>${r.ref}</strong><span class="sim">87% similar</span></div><div class="bar"><span style="width:87%"></span></div><div class="small">Past estimate ${r.pre[0]}–${r.pre[1]} h → <strong>AI reduction −40%</strong> (boilerplate) → ${r.exp}–${r.jr} h</div><div class="small muted">Delivered with actual hours: 9 h</div></div>`;
+    body.innerHTML = `<p class="small muted">Calculation order: benchmark → recent actual hours → past estimate with AI reduction → AI guess.</p>${best}
+      <div class="match"><div class="hstack" style="justify-content:space-between"><span>Similar: Course marketplace · Web</span><span class="sim">74% similar</span></div><div class="bar"><span style="width:74%"></span></div><div class="small muted">Estimated 8–12 h (pre-AI)</div></div>
+      <div class="match"><div class="hstack" style="justify-content:space-between"><span>Similar: Field service app · Mobile</span><span class="sim">69% similar</span></div><div class="bar"><span style="width:69%"></span></div><div class="small muted">Estimated 6–10 h · actual 5 h</div></div>`;
+  }
+  body.innerHTML += `<div class="hstack" style="justify-content:flex-end"><button class="btn btn-secondary" type="button" onclick="closeDrawer()">Close</button><button class="btn btn-primary" type="button" onclick="setDecision(${r.id}, 'accepted'); closeDrawer()">Accept ${mn}–${mx} h</button></div>`;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'false');
+  document.getElementById('drawer-backdrop').classList.add('open');
+  document.querySelector('#drawer .icon-btn').focus();
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'true');
+  document.getElementById('drawer-backdrop').classList.remove('open');
+}
+
+// ---------- Navigation ----------
+const crumbsFor = {
+  home: ['Home'], new: ['Home', 'New estimation request'], estimate: ['Home', 'Estimates', 'Patient portal MVP'],
+  review: ['Home', 'Reviews', 'Fleet tracking dashboard'], export: ['Home', 'Estimates', 'Field service app', 'Export'],
+  import: ['Knowledge base', 'Import past projects'], actuals: ['Knowledge base', 'Actual hours', 'Field service app'],
+  benchmarks: ['Knowledge base', 'Feature hours'], admin: ['Admin', 'Settings'], notfound: ['Page not found'],
+};
+const navKey = { new: 'home', export: 'estimate' };
+function go(name) {
+  if (!document.getElementById('screen-' + name)) name = 'notfound';
+  const isSignin = name === 'signin';
+  document.getElementById('app').style.display = isSignin ? 'none' : '';
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
+  document.querySelectorAll('[data-nav]').forEach(a => a.toggleAttribute('aria-current', false));
+  const cur = document.querySelector(`[data-nav="${navKey[name] || name}"]`); if (cur) cur.setAttribute('aria-current', 'page');
+  const c = crumbsFor[name] || [];
+  document.getElementById('crumbs').innerHTML = c.map((t, i) => i === c.length - 1 ? `<span aria-current="page">${t}</span>` : `<a href="#home" onclick="go('home');return false">${t}</a><span aria-hidden="true">/</span>`).join('');
+  document.getElementById('sidebar').classList.remove('open');
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  window.scrollTo(0, 0);
+  const h = document.querySelector('.screen.active h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+}
+function segPick(btn) { btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn))); }
+function decide(btn, d) {
+  const tr = btn.closest('tr'); tr.className = d === 'accept' ? 'row-accepted' : 'row-rejected';
+  const cell = btn.closest('.actions'); const html = cell.innerHTML;
+  cell.innerHTML = d === 'accept' ? '<span class="badge b-approved">✓ Accepted</span>' : '<span class="badge b-draft">Removed</span>';
+  lastAction = () => { tr.className = ''; cell.innerHTML = html; };
+  toast(d === 'accept' ? 'Feature accepted' : 'Feature removed', true);
+}
+
+// ---------- Feedback ----------
+let toastTimer;
+function toast(text, withUndo) {
+  document.getElementById('toast-text').textContent = text;
+  document.getElementById('toast-undo').style.display = withUndo ? '' : 'none';
+  const t = document.getElementById('toast'); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+}
+function undo() { if (lastAction) { lastAction(); lastAction = null; toast('Undone'); } }
+
+// ---------- Theme ----------
+function toggleTheme() {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  document.getElementById('theme-label').textContent = dark ? 'Dark mode' : 'Light mode';
+  try { localStorage.setItem('f3-theme', root.dataset.theme); } catch (e) {}
+}
+try { const saved = localStorage.getItem('f3-theme'); if (saved) { document.documentElement.dataset.theme = saved; document.getElementById('theme-label').textContent = saved === 'dark' ? 'Light mode' : 'Dark mode'; } } catch (e) {}
+
+// ---------- Keyboard ----------
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDrawer(); document.getElementById('sidebar').classList.remove('open'); }
+  if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); document.querySelector('.search input')?.focus(); }
+});
+window.addEventListener('hashchange', () => go(location.hash.slice(1) || 'home'));
+
+renderTable();
+go(location.hash.slice(1) || 'signin');
+</script>
+</body>
+</html>
