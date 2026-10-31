@@ -2,7 +2,7 @@
 
 Folio3's internal tool for estimating software projects. It reuses past estimates and the hours teams really spend building features with AI. See the product brief: [docs/product-brief.md](docs/product-brief.md).
 
-> **Status:** project foundation only: app shell, database, health check and tooling. Estimation features arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
+> **Status:** foundation plus sign-in and roles: app shell, Google sign-in for `@folio3.com`, roles, people management, database, health check and tooling. Estimation features arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
 
 ## Prerequisites
 
@@ -54,8 +54,11 @@ copy .env.example .env
 ```powershell
 docker compose up -d db      # start PostgreSQL (with pgvector) in a container
 npm.cmd run db:deploy        # apply database migrations
+npm.cmd run db:seed          # create the development test users (safe to repeat)
 npm.cmd run dev              # http://localhost:3000
 ```
+
+Open http://localhost:3000 and use **Development sign-in**: pick a test user and enter the password from `DEV_USER_PASSWORD` in `.env`. Use the same address as `AUTH_URL` (by default `http://localhost:3000`); sign-in from any other address or port is refused.
 
 ### Option B: run everything in containers (demos)
 
@@ -63,7 +66,7 @@ npm.cmd run dev              # http://localhost:3000
 docker compose up --build    # database + app; http://localhost:3000
 ```
 
-The app container checks its settings, applies migrations, then starts.
+The app container checks its settings, applies migrations, then starts. It runs in production mode, so development sign-in is off: it needs `AUTH_SECRET` and the Google settings below in `.env`.
 
 ### Check it works
 
@@ -85,6 +88,50 @@ npm.cmd run check-env
 | `DATABASE_URL` | yes | – | PostgreSQL URL (`postgresql://…`) |
 | `NODE_ENV` | no | `development` | `development`, `test` or `production` |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`; logs are JSON lines |
+| `AUTH_SECRET` | yes | – | At least 32 random characters; signs session cookies. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+| `AUTH_URL` | yes | – | The address people open, for example `http://localhost:3000`. Sign-in from any other address is refused |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | in production | – | Google OAuth client (see below). Optional locally when `AUTH_DEV_LOGIN=1` |
+| `ADMIN_EMAILS` | no | – | Comma-separated `@folio3.com` emails that become Admin on first sign-in |
+| `AUTH_DEV_LOGIN` | no | `0` | `1` turns on development sign-in. **Refused when `NODE_ENV=production`** |
+| `DEV_USER_PASSWORD` | no | example value | Password of the seeded development users |
+
+## Sign-in and roles
+
+Only verified **`@folio3.com` Google accounts** can sign in. Sessions last 12 hours and are stored in the database, so deactivating someone signs them out at once.
+
+| Role | Create and edit estimates | Approve estimates | Manage people and settings |
+|---|---|---|---|
+| Estimator | yes | – | – |
+| Tech Lead | yes | yes | – |
+| Architect | yes | yes | – |
+| Admin | yes | – | yes |
+
+- **First Admin:** put your email in `ADMIN_EMAILS` before you sign in for the first time. Removing it later doesn't remove the role.
+- **Everyone else** sees a "Waiting for access" page after their first sign-in, until an Admin gives them a role under **Settings → People and roles**. Admins can also invite an `@folio3.com` address with a role before the person signs in, and deactivate or reactivate people. There must always be at least one active Admin.
+
+### Create the Google OAuth client (one-time, product owner or IT)
+
+1. In the [Google Cloud console](https://console.cloud.google.com/) for the Folio3 organization, create or pick a project.
+2. **APIs & Services → OAuth consent screen**: choose **Internal** (only Folio3 Workspace accounts), app name "F3 Estimation Tool", scopes `openid`, `email`, `profile`.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**, type **Web application**:
+   - Authorized JavaScript origin: `http://localhost:3000` (add the hosted address later)
+   - Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+4. Put the client ID and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Never paste the secret into chat, tickets or git.
+5. Restart the app. "Continue with Google" is now enabled.
+
+### Development sign-in
+
+With `AUTH_DEV_LOGIN=1` (the `.env.example` default) the sign-in page also shows **Development sign-in**, for working without Google. `npm.cmd run db:seed` creates these users, all with the `DEV_USER_PASSWORD` password:
+
+| User | Role |
+|---|---|
+| `dev.estimator@folio3.com` | Estimator |
+| `dev.techlead@folio3.com` | Tech Lead |
+| `dev.architect@folio3.com` | Architect |
+| `dev.admin@folio3.com` | Admin |
+| `dev.newcomer@folio3.com` | none (shows the waiting page) |
+
+Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production.
 
 ## Scripts
 
@@ -95,8 +142,10 @@ npm.cmd run check-env
 | `check-env` | Validate settings |
 | `lint`, `format`, `format:check`, `typecheck` | Code quality |
 | `test` | Unit tests (Vitest) |
-| `test:e2e` | Smoke tests in a browser (Playwright). Needs `npm run build` first and a running database |
+| `test:int` | Integration tests against the database: sign-in, roles, people management. Needs a running, migrated database |
+| `test:e2e` | Browser tests (Playwright) for every role. Needs `npm run build` first and a running, migrated database; seeds the dev users itself |
 | `db:deploy` | Apply migrations |
+| `db:seed` | Create or reset the development test users (needs `AUTH_DEV_LOGIN=1`) |
 | `db:migrate` | Create and apply a new migration during development |
 | `db:generate` | Regenerate the Prisma client (also runs after `npm ci`) |
 | `db:studio` | Browse the database |
@@ -111,12 +160,17 @@ Real estimates, SOWs and RFPs used for demos or imports go in **`/samples/`**, *
 
 ```
 src/app/            pages and API routes (Next.js App Router)
-src/app/api/health  health check
+src/app/(app)/      signed-in pages (home, settings/people)
+src/app/sign-in/    sign-in page
+src/app/api/        health check, auth (Better Auth), people API
+src/components/     brand and app shell (sidebar, top bar)
 src/lib/            settings (env), logger
-src/server/         server-only code: database client, health logic
-prisma/             database schema and migrations
+src/server/         server-only code: database client, health, people service
+src/server/auth/    sign-in setup, roles and permissions, session helpers
+prisma/             database schema, migrations and dev seed
 scripts/            check-env (startup settings check)
-e2e/                Playwright smoke tests
+test/               integration test setup and helpers
+e2e/                Playwright browser tests
 docker/, Dockerfile, compose.yaml   containers
 docs/               product brief, Excel template
 data/               feature benchmark seed and survey
@@ -125,4 +179,4 @@ openspec/           specs and planned changes
 
 ## Tech
 
-Next.js 16 (React 19, TypeScript), Tailwind CSS 4, PostgreSQL 17 + pgvector, Prisma 7, Vitest, Playwright, GitHub Actions. The reasons for each choice are in [`openspec/changes/setup-project-foundation/design.md`](openspec/changes/setup-project-foundation/design.md).
+Next.js 16 (React 19, TypeScript), Tailwind CSS 4, PostgreSQL 17 + pgvector, Prisma 7, Better Auth, Vitest, Playwright, GitHub Actions. The reasons for each choice are in [`openspec/changes/setup-project-foundation/design.md`](openspec/changes/setup-project-foundation/design.md).

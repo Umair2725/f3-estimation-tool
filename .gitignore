@@ -44,6 +44,7 @@ yarn-error.log*
 /test-results/
 /blob-report/
 /playwright/.cache/
+/playwright/.auth/
 
 # generated Prisma client
 /src/generated/

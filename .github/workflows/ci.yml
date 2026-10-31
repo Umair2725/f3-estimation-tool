@@ -31,6 +31,10 @@ jobs:
       DATABASE_URL: postgresql://f3:f3_ci_password@localhost:5432/f3_estimation
       NODE_ENV: test
       NEXT_TELEMETRY_DISABLED: "1"
+      AUTH_SECRET: ci-only-secret-0123456789abcdefghijklmnop
+      AUTH_URL: http://localhost:3100
+      AUTH_DEV_LOGIN: "1"
+      ADMIN_EMAILS: dev.admin@folio3.com
 
     steps:
       - uses: actions/checkout@v5
@@ -46,6 +50,9 @@ jobs:
       - name: Apply database migrations
         run: npm run db:deploy
 
+      - name: Seed development users
+        run: npm run db:seed
+
       - name: Lint
         run: npm run lint
 
@@ -58,6 +65,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Integration tests (database and sign-in)
+        run: npm run test:int
+
       - name: Build
         run: npm run build
         env:
@@ -66,10 +76,10 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: End-to-end smoke tests
+      # The production build runs with NODE_ENV=test so the development sign-in is available
+      # (it is refused when NODE_ENV=production). See playwright.config.ts.
+      - name: End-to-end tests
         run: npm run test:e2e
-        env:
-          NODE_ENV: production
 
       - name: Upload Playwright report
         if: failure()
