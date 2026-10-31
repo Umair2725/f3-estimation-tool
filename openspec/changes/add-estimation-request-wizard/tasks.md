@@ -37,7 +37,7 @@
 ## 6. Docs and CI
 
 - [x] 6.1 Update `README.md` (what the tool does now, the request flow, Settings → Tech stack, sample data from the seed); verify a reader can create a request from a fresh clone with the dev sign-in
-- [ ] 6.2 Verify CI (migrations, seed, unit, integration, e2e) is green on the pull request
+- [x] 6.2 Verify CI (migrations, seed, unit, integration, e2e) is green on the pull request
 
 ## 7. Integration check
 
