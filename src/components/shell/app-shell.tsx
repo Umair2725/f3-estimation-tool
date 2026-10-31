@@ -51,7 +51,7 @@ export function AppShell(props: { nav: NavGroup[]; person: Person; children: Rea
                 <Link
                   key={item.label}
                   href={item.href}
-                  aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
+                  aria-current={isCurrent(pathname, item.match ?? item.href) ? "page" : undefined}
                   onClick={() => setOpen(false)}
                   className="rounded-lg px-2.5 py-2 font-medium text-foreground-2 hover:bg-surface-2 hover:text-foreground aria-[current=page]:bg-brand/10 aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
                 >
@@ -138,5 +138,6 @@ export function AppShell(props: { nav: NavGroup[]; person: Person; children: Rea
 }
 
 function isCurrent(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }

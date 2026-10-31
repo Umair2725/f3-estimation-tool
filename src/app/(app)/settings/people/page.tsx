@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { lastActiveLabel } from "@/lib/relative-time";
 import { can } from "@/server/auth/permissions";
-import { requireUser } from "@/server/auth/session";
+import { requireRole } from "@/server/auth/session";
 import { listPeople } from "@/server/people";
 import { PeopleManager } from "./people-manager";
 
 export const metadata: Metadata = { title: "People and roles · F3 Estimation Tool" };
 
 export default async function PeoplePage() {
-  const user = await requireUser("/settings/people");
+  const user = await requireRole("/settings/people");
+  if (!user) return null; // the layout shows the waiting page
 
   if (!can(user.role, "people.manage")) {
     return (

@@ -11,3 +11,13 @@ export function lastActiveLabel(at: Date | null, now: Date): string {
   if (days < 30) return `${days} days ago`;
   return at.toISOString().slice(0, 10);
 }
+
+/** "just now", "2 minutes ago", "1 hour ago": for the wizard's "Draft saved" line. */
+export function savedAgoLabel(at: Date, now: Date): string {
+  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return at.toISOString().slice(0, 10);
+}

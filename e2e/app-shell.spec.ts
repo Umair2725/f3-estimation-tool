@@ -4,7 +4,7 @@ import { authFile } from "./helpers";
 // specs/app-shell, signed in as the dev Admin.
 test.use({ storageState: authFile("admin") });
 
-test("home page shows the header, title, purpose and coming-soon notice", async ({ page }) => {
+test("home page shows the header, greeting, drafts and request list", async ({ page }) => {
   await page.goto("/");
   const header = page.locator("header");
   await expect(header).toContainText("F3 Estimation Tool");
@@ -12,9 +12,12 @@ test("home page shows the header, title, purpose and coming-soon notice", async 
   await expect(page.getByTestId("person-name")).toHaveText("Dev Admin");
   await expect(page.getByTestId("person-role")).toHaveText("Admin");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "F3 Estimation Tool" })).toBeVisible();
-  await expect(page.getByText(/reusing Folio3's past estimates/)).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("coming soon");
+  await expect(
+    page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), Dev$/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "New estimation request" })).toBeVisible();
+  await expect(page.getByTestId("my-drafts")).toContainText("My drafts");
+  await expect(page.getByRole("heading", { name: "Estimation requests" })).toBeVisible();
 });
 
 test("unknown path returns 404 with a friendly page and a link home", async ({ page }) => {
