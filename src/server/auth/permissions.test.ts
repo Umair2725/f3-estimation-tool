@@ -6,24 +6,28 @@ const expected: Record<Role, Record<Permission, boolean>> = {
   ESTIMATOR: {
     "estimate.edit": true,
     "estimate.approve": false,
+    "estimate.edit-any": false,
     "people.manage": false,
     "settings.manage": false,
   },
   TECH_LEAD: {
     "estimate.edit": true,
     "estimate.approve": true,
+    "estimate.edit-any": false,
     "people.manage": false,
     "settings.manage": false,
   },
   ARCHITECT: {
     "estimate.edit": true,
     "estimate.approve": true,
+    "estimate.edit-any": false,
     "people.manage": false,
     "settings.manage": false,
   },
   ADMIN: {
     "estimate.edit": true,
     "estimate.approve": false,
+    "estimate.edit-any": true,
     "people.manage": true,
     "settings.manage": true,
   },

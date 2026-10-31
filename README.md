@@ -2,7 +2,7 @@
 
 Folio3's internal tool for estimating software projects. It reuses past estimates and the hours teams really spend building features with AI. See the product brief: [docs/product-brief.md](docs/product-brief.md).
 
-> **Status:** foundation plus sign-in and roles: app shell, Google sign-in for `@folio3.com`, roles, people management, database, health check and tooling. Estimation features arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
+> **Status:** foundation plus sign-in and roles: app shell, Google sign-in for `@folio3.com`, roles, people management, database, health check and tooling. Estimation requests (Home, the four-step wizard, the tech stack catalog) are in; hours, matching and the Excel export arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
 
 ## Prerequisites
 
@@ -131,7 +131,30 @@ With `AUTH_DEV_LOGIN=1` (the `.env.example` default) the sign-in page also shows
 | `dev.admin@folio3.com` | Admin |
 | `dev.newcomer@folio3.com` | none (shows the waiting page) |
 
-Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production.
+Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), reset to the same state on every run.
+
+## Estimation requests
+
+1. On **Home**, click **New estimation request**.
+2. Work through the four steps:
+   - **Project:** name, client, project manager, date
+   - **Platforms & stack:** application types, operating systems, browsers, and the parts with their technologies
+   - **Environment & compliance:** hosting, environments, app stores, compliance and non-functional needs
+   - **Requirements:** the feature list (document upload comes later)
+3. Every step is saved as a **Draft** when you move on, go back or click **Save & exit**. **Continue where you left off** on Home reopens your latest draft at the step you last saved.
+4. **Finish** checks that the request has a client, at least one part with a technology, and at least one feature, then opens the request page.
+
+Who can do what:
+- Everyone with a role can see every request.
+- Only the owner or an Admin can edit a request (while it's a Draft or has Changes requested) or delete a draft.
+
+Hours are added in a later release, so the Home list shows "–" for now.
+
+**Settings → Tech stack** (Admins only):
+- add technologies and choose which parts each applies to
+- retire old ones: they disappear from the wizard, but requests that already use them keep them
+
+The catalog starts with the technologies from the product brief.
 
 ## Scripts
 
@@ -143,7 +166,7 @@ Running the seed again resets these users to the roles above. The seed and the d
 | `lint`, `format`, `format:check`, `typecheck` | Code quality |
 | `test` | Unit tests (Vitest) |
 | `test:int` | Integration tests against the database: sign-in, roles, people management. Needs a running, migrated database |
-| `test:e2e` | Browser tests (Playwright) for every role. Needs `npm run build` first and a running, migrated database; seeds the dev users itself |
+| `test:e2e` | Browser tests (Playwright) for every role. Needs `npm run build` first and a running, migrated database; seeds the dev users itself. In CI the HTML report is kept for 30 days on every run (Actions → the run → Artifacts → `playwright-report`) |
 | `db:deploy` | Apply migrations |
 | `db:seed` | Create or reset the development test users (needs `AUTH_DEV_LOGIN=1`) |
 | `db:migrate` | Create and apply a new migration during development |
@@ -160,12 +183,12 @@ Real estimates, SOWs and RFPs used for demos or imports go in **`/samples/`**, *
 
 ```
 src/app/            pages and API routes (Next.js App Router)
-src/app/(app)/      signed-in pages (home, settings/people)
+src/app/(app)/      signed-in pages: home, estimates (wizard, request page), settings
 src/app/sign-in/    sign-in page
 src/app/api/        health check, auth (Better Auth), people API
 src/components/     brand and app shell (sidebar, top bar)
-src/lib/            settings (env), logger
-src/server/         server-only code: database client, health, people service
+src/lib/            settings (env), logger, estimation options and validation
+src/server/         server-only code: database client, health, people, estimation requests, tech stack
 src/server/auth/    sign-in setup, roles and permissions, session helpers
 prisma/             database schema, migrations and dev seed
 scripts/            check-env (startup settings check)

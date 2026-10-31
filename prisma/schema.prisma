@@ -41,6 +41,7 @@ model User {
   sessions    Session[]
   accounts    Account[]
   invitations RoleInvitation[]
+  requests    EstimationRequest[]
 
   @@map("user")
 }
@@ -111,4 +112,112 @@ model AppMeta {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_meta")
+}
+
+// ---------- Estimation requests (specs/estimation-requests, specs/tech-stack-catalog) ----------
+
+enum RequestStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  EXPORTED
+}
+
+// One development sheet each in the Excel template.
+enum ProjectPart {
+  BACKEND
+  WEB_FRONTEND
+  ADMIN_PANEL
+  MOBILE
+  CLOUD_INFRA
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  nameKey   String   @unique @map("name_key") // lowercased, trimmed, inner spaces collapsed
+  createdAt DateTime @default(now()) @map("created_at")
+
+  requests EstimationRequest[]
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "client_name_trgm_idx")
+  @@map("client")
+}
+
+model EstimationRequest {
+  id               String        @id @default(uuid())
+  projectName      String        @map("project_name")
+  clientId         String?       @map("client_id")
+  client           Client?       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  projectManager   String        @map("project_manager")
+  projectDate      DateTime      @map("project_date") @db.Date
+  status           RequestStatus @default(DRAFT)
+  ownerId          String        @map("owner_id")
+  owner            User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  lastStep         Int           @default(1) @map("last_step")
+  applicationTypes String[]      @map("application_types")
+  operatingSystems String[]      @map("operating_systems")
+  browsers         String[]
+  considerations   Json          @default("{}") // validated by src/lib/estimation/schemas.ts
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  parts    RequestPart[]
+  features Feature[]
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([ownerId, status])
+  @@index([projectName(ops: raw("gin_trgm_ops"))], type: Gin, map: "estimation_request_project_name_trgm_idx")
+  @@map("estimation_request")
+}
+
+model RequestPart {
+  id           String                  @id @default(uuid())
+  requestId    String                  @map("request_id")
+  request      EstimationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  part         ProjectPart
+  technologies RequestPartTechnology[]
+
+  @@unique([requestId, part])
+  @@map("request_part")
+}
+
+model RequestPartTechnology {
+  requestPartId String      @map("request_part_id")
+  requestPart   RequestPart @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
+  technologyId  String      @map("technology_id")
+  technology    Technology  @relation(fields: [technologyId], references: [id], onDelete: Restrict)
+
+  @@id([requestPartId, technologyId])
+  @@index([technologyId])
+  @@map("request_part_technology")
+}
+
+model Technology {
+  id        String        @id @default(uuid())
+  name      String
+  nameKey   String        @unique @map("name_key")
+  parts     ProjectPart[]
+  retiredAt DateTime?     @map("retired_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  usedBy RequestPartTechnology[]
+
+  @@map("technology")
+}
+
+model Feature {
+  id          String            @id @default(uuid())
+  requestId   String            @map("request_id")
+  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  parts       ProjectPart[]
+  position    Int
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([requestId, position])
+  @@map("feature")
 }

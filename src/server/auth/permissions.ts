@@ -16,6 +16,8 @@ const ALL: readonly Role[] = ROLES;
 const RULES = {
   "estimate.edit": ALL,
   "estimate.approve": ["TECH_LEAD", "ARCHITECT"],
+  // Edit or delete someone else's request (specs/estimation-requests).
+  "estimate.edit-any": ["ADMIN"],
   "people.manage": ["ADMIN"],
   "settings.manage": ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;

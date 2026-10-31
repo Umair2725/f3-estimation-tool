@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastActiveLabel } from "./relative-time";
+import { lastActiveLabel, savedAgoLabel } from "./relative-time";
 
 const now = new Date("2026-10-30T12:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -16,5 +16,17 @@ describe("lastActiveLabel", () => {
     [new Date("2026-01-02T00:00:00Z"), "2026-01-02"],
   ])("%s → %s", (at, label) => {
     expect(lastActiveLabel(at, now)).toBe(label);
+  });
+});
+
+describe("savedAgoLabel", () => {
+  it.each([
+    [ago(20_000), "just now"],
+    [ago(MIN), "1 minute ago"],
+    [ago(12 * MIN), "12 minutes ago"],
+    [ago(60 * MIN), "1 hour ago"],
+    [ago(26 * 60 * MIN), "2026-10-29"],
+  ])("%s → %s", (at, label) => {
+    expect(savedAgoLabel(at, now)).toBe(label);
   });
 });

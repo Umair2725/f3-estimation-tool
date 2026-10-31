@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
-import { PrismaClient, type Role } from "../src/generated/prisma/client";
+import { PrismaClient, type ProjectPart, type Role } from "../src/generated/prisma/client";
 
 try {
   process.loadEnvFile();
@@ -65,6 +65,139 @@ async function main() {
       });
     }
     console.log(`seeded ${person.email} (${person.role ?? "no role"})`);
+  }
+  await seedRequests();
+}
+
+// Sample estimation requests with fictional clients (the same names as the design prototype;
+// never real client names). Recreated on every run so they always look like this.
+type SampleRequest = {
+  projectName: string;
+  client: string;
+  owner: string;
+  lastStep: number;
+  daysAgo: number;
+  parts: { part: ProjectPart; technologies: string[] }[];
+  compliance: string[];
+  features: { name: string; description?: string; parts: ProjectPart[] }[];
+};
+
+const SAMPLE_REQUESTS: SampleRequest[] = [
+  {
+    projectName: "Patient portal MVP",
+    client: "Northwind Clinics",
+    owner: "dev.estimator@folio3.com",
+    lastStep: 4,
+    daysAgo: 2,
+    parts: [
+      { part: "WEB_FRONTEND", technologies: ["React"] },
+      { part: "BACKEND", technologies: ["Node.js"] },
+      { part: "MOBILE", technologies: ["React Native"] },
+    ],
+    compliance: ["HIPAA"],
+    features: [
+      {
+        name: "Patient sign up & sign in",
+        description: "Email and Google sign-in, forgot password",
+        parts: ["WEB_FRONTEND", "MOBILE", "BACKEND"],
+      },
+      {
+        name: "Appointment booking",
+        description: "Doctor availability, reminders",
+        parts: ["WEB_FRONTEND", "BACKEND"],
+      },
+      { name: "Lab results", parts: ["MOBILE", "BACKEND"] },
+    ],
+  },
+  {
+    projectName: "Fleet tracking dashboard",
+    client: "Contoso Logistics",
+    owner: "dev.techlead@folio3.com",
+    lastStep: 2,
+    daysAgo: 5,
+    parts: [
+      { part: "WEB_FRONTEND", technologies: ["Next.js"] },
+      { part: "BACKEND", technologies: [".NET"] },
+      { part: "CLOUD_INFRA", technologies: ["Azure"] },
+    ],
+    compliance: [],
+    features: [],
+  },
+  {
+    projectName: "Field service app",
+    client: "Fabrikam Energy",
+    owner: "dev.architect@folio3.com",
+    lastStep: 4,
+    daysAgo: 9,
+    parts: [
+      { part: "MOBILE", technologies: ["Flutter"] },
+      { part: "BACKEND", technologies: ["Python"] },
+    ],
+    compliance: [],
+    features: [
+      {
+        name: "Work orders",
+        description: "Assign, update and close jobs offline",
+        parts: ["MOBILE", "BACKEND"],
+      },
+      { name: "Photo capture", parts: ["MOBILE"] },
+    ],
+  },
+];
+
+const key = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+
+async function seedRequests() {
+  for (const sample of SAMPLE_REQUESTS) {
+    const owner = await db.user.findUniqueOrThrow({ where: { email: sample.owner } });
+    const client = await db.client.upsert({
+      where: { nameKey: key(sample.client) },
+      create: { name: sample.client, nameKey: key(sample.client) },
+      update: {},
+    });
+    await db.estimationRequest.deleteMany({
+      where: { projectName: sample.projectName, ownerId: owner.id },
+    });
+    const technologies = await db.technology.findMany();
+    const techId = (name: string) => {
+      const found = technologies.find((t) => t.nameKey === key(name));
+      if (!found) throw new Error(`Technology ${name} is missing from the catalog`);
+      return found.id;
+    };
+    await db.estimationRequest.create({
+      data: {
+        projectName: sample.projectName,
+        clientId: client.id,
+        projectManager: owner.name,
+        projectDate: new Date(),
+        ownerId: owner.id,
+        lastStep: sample.lastStep,
+        // In the past, so requests people create are always newer (e2e relies on this).
+        createdAt: new Date(Date.now() - sample.daysAgo * 86_400_000),
+        updatedAt: new Date(Date.now() - sample.daysAgo * 86_400_000),
+        applicationTypes: sample.parts.some((p) => p.part === "MOBILE")
+          ? ["Web", "Mobile"]
+          : ["Web"],
+        operatingSystems: sample.parts.some((p) => p.part === "MOBILE") ? ["iOS", "Android"] : [],
+        browsers: ["Chrome", "Safari", "Edge"],
+        considerations: {
+          v: 1,
+          hosting: ["AWS"],
+          environments: ["Staging", "Production"],
+          compliance: sample.compliance,
+        },
+        parts: {
+          create: sample.parts.map((p) => ({
+            part: p.part,
+            technologies: { create: p.technologies.map((t) => ({ technologyId: techId(t) })) },
+          })),
+        },
+        features: {
+          create: sample.features.map((f, position) => ({ ...f, position })),
+        },
+      },
+    });
+    console.log(`seeded request "${sample.projectName}" (${sample.client})`);
   }
 }
 

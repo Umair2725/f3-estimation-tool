@@ -25,3 +25,13 @@ describe("navFor (specs/app-shell: role-aware navigation)", () => {
     expect(settings?.href).toBe("/settings/people");
   });
 });
+
+describe("navFor links (specs/estimation-requests)", () => {
+  it("Estimates links to the request list and is current on request pages", () => {
+    const estimates = navFor("ESTIMATOR")
+      .flatMap((g) => g.items)
+      .find((i) => i.label === "Estimates");
+    expect(estimates).toMatchObject({ href: "/#requests", match: "/estimates" });
+    expect(estimates?.soon).toBeUndefined();
+  });
+});
