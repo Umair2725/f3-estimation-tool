@@ -17,6 +17,9 @@ samples
 local-data
 
 docs
+# The Excel template is read at runtime by the export (specs/excel-export).
+!docs/templates
+!docs/templates/Empty_Estimation_Sheet.xlsx
 data
 openspec
 .claude

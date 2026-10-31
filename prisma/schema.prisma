@@ -42,6 +42,7 @@ model User {
   accounts    Account[]
   invitations RoleInvitation[]
   requests    EstimationRequest[]
+  exports     ExportRecord[]
 
   @@map("user")
 }
@@ -160,11 +161,20 @@ model EstimationRequest {
   operatingSystems String[]      @map("operating_systems")
   browsers         String[]
   considerations   Json          @default("{}") // validated by src/lib/estimation/schemas.ts
+  // Overheads and price (specs/estimate-hours); new requests copy EstimateDefaults.
+  qaPercent        Int           @default(25) @map("qa_percent")
+  qaEnabled        Boolean       @default(true) @map("qa_enabled")
+  pmPercent        Int           @default(30) @map("pm_percent")
+  pmEnabled        Boolean       @default(true) @map("pm_enabled")
+  bugFixPercent    Int           @default(10) @map("bug_fix_percent")
+  hourlyRate       Int           @default(30) @map("hourly_rate") // USD per hour
+  rateConfirmed    Boolean       @default(false) @map("rate_confirmed")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
   parts    RequestPart[]
   features Feature[]
+  exports  ExportRecord[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([ownerId, status])
@@ -178,6 +188,12 @@ model RequestPart {
   request      EstimationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
   part         ProjectPart
   technologies RequestPartTechnology[]
+  tasks        EstimateTask[]
+  // Per development sheet; hours in tenths of an hour.
+  deploymentMinTenths Int      @default(0) @map("deployment_min_tenths")
+  deploymentMaxTenths Int      @default(0) @map("deployment_max_tenths")
+  assumptions         String[]
+  risks               String[]
 
   @@unique([requestId, part])
   @@map("request_part")
@@ -215,9 +231,73 @@ model Feature {
   description String?
   parts       ProjectPart[]
   position    Int
+  tasks       EstimateTask[]
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
   @@index([requestId, position])
   @@map("feature")
+}
+
+// ---------- Estimate hours and export (specs/estimate-hours, specs/excel-export, specs/estimate-defaults) ----------
+
+// One per feature × part: a Task on that part's development sheet. Name and order come from the feature.
+model EstimateTask {
+  id            String      @id @default(uuid())
+  featureId     String      @map("feature_id")
+  feature       Feature     @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  requestPartId String      @map("request_part_id")
+  requestPart   RequestPart @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
+  subTasks      SubTask[]
+
+  @@unique([featureId, requestPartId])
+  @@index([requestPartId])
+  @@map("estimate_task")
+}
+
+model SubTask {
+  id        String       @id @default(uuid())
+  taskId    String       @map("task_id")
+  task      EstimateTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  minTenths Int          @map("min_tenths") // hours × 10, exact
+  maxTenths Int          @map("max_tenths")
+  comment   String       @default("")
+  position  Int
+
+  @@index([taskId, position])
+  @@map("sub_task")
+}
+
+// A single row (id "default") holding what new requests start from.
+model EstimateDefaults {
+  id            String   @id @default("default")
+  qaPercent     Int      @default(25) @map("qa_percent")
+  pmPercent     Int      @default(30) @map("pm_percent")
+  bugFixPercent Int      @default(10) @map("bug_fix_percent")
+  defaultRate   Int      @default(30) @map("default_rate")
+  approvedRates Int[]    @default([25, 30, 35, 40, 45, 50]) @map("approved_rates")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by_id")
+
+  @@map("estimate_defaults")
+}
+
+enum ExportKind {
+  INTERNAL
+  CLIENT
+}
+
+model ExportRecord {
+  id        String            @id @default(uuid())
+  requestId String            @map("request_id")
+  request   EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String            @map("user_id")
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  kind      ExportKind
+  fileName  String            @map("file_name")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt(sort: Desc)])
+  @@map("export_record")
 }

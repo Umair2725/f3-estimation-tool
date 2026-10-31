@@ -79,7 +79,15 @@ type SampleRequest = {
   daysAgo: number;
   parts: { part: ProjectPart; technologies: string[] }[];
   compliance: string[];
-  features: { name: string; description?: string; parts: ProjectPart[] }[];
+  features: {
+    name: string;
+    description?: string;
+    parts: ProjectPart[];
+    // Sample Sub tasks per part: [title, min hours, max hours].
+    hours?: Partial<Record<ProjectPart, [string, number, number][]>>;
+  }[];
+  deployment?: Partial<Record<ProjectPart, [number, number]>>;
+  assumptions?: Partial<Record<ProjectPart, string[]>>;
 };
 
 const SAMPLE_REQUESTS: SampleRequest[] = [
@@ -164,7 +172,7 @@ async function seedRequests() {
       if (!found) throw new Error(`Technology ${name} is missing from the catalog`);
       return found.id;
     };
-    await db.estimationRequest.create({
+    const request = await db.estimationRequest.create({
       data: {
         projectName: sample.projectName,
         clientId: client.id,
@@ -197,6 +205,7 @@ async function seedRequests() {
         },
       },
     });
+    await seedHours(request.id, sample);
     console.log(`seeded request "${sample.projectName}" (${sample.client})`);
   }
 }
@@ -208,3 +217,37 @@ main()
     await db.$disconnect();
     process.exit(1);
   });
+
+/** Tasks for every feature × part, with the sample's Sub tasks, deployment and assumptions. */
+async function seedHours(requestId: string, sample: SampleRequest) {
+  const parts = await db.requestPart.findMany({ where: { requestId } });
+  const features = await db.feature.findMany({ where: { requestId } });
+  for (const part of parts) {
+    const deployment = sample.deployment?.[part.part];
+    await db.requestPart.update({
+      where: { id: part.id },
+      data: {
+        deploymentMinTenths: (deployment?.[0] ?? 0) * 10,
+        deploymentMaxTenths: (deployment?.[1] ?? 0) * 10,
+        assumptions: sample.assumptions?.[part.part] ?? [],
+      },
+    });
+    for (const feature of features.filter((f) => f.parts.includes(part.part))) {
+      const rows = sample.features.find((f) => f.name === feature.name)?.hours?.[part.part] ?? [];
+      await db.estimateTask.create({
+        data: {
+          featureId: feature.id,
+          requestPartId: part.id,
+          subTasks: {
+            create: rows.map(([title, min, max], position) => ({
+              title,
+              minTenths: min * 10,
+              maxTenths: max * 10,
+              position,
+            })),
+          },
+        },
+      });
+    }
+  }
+}

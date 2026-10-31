@@ -70,6 +70,8 @@ export function readConsiderations(value: unknown): Considerations {
 }
 
 export const featureSchema = z.object({
+  // The existing feature id, so saving keeps its estimate Tasks; new rows send a client-only key.
+  key: z.string().max(100).optional(),
   name: text(200).min(1, "Enter a feature name"),
   description: text(1000).default(""),
   parts: uniqueList(partSchema).refine((p) => p.length > 0, "Choose at least one part"),
@@ -89,3 +91,64 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+// ---------- Estimate hours (specs/estimate-hours) ----------
+
+export const HOURS_MESSAGE = "Enter hours from 0 to 9999, with at most one decimal";
+
+/** Hours: 0–9999 with at most one decimal place. */
+export const hoursSchema = z
+  .number({ error: HOURS_MESSAGE })
+  .min(0, HOURS_MESSAGE)
+  .max(9999, HOURS_MESSAGE)
+  .refine((h) => Math.abs(Math.round(h * 10) - h * 10) < 1e-9, HOURS_MESSAGE);
+
+const wholePercent = z
+  .number({ error: "Enter a whole number from 0 to 100" })
+  .int("Enter a whole number from 0 to 100")
+  .min(0, "Enter a whole number from 0 to 100")
+  .max(100, "Enter a whole number from 0 to 100");
+
+const lines = z
+  .array(text(500))
+  .max(50, "Use at most 50 lines")
+  .transform((items) => items.filter((line) => line.length > 0));
+
+export const estimateSchema = z.object({
+  tasks: z
+    .array(
+      z.object({
+        taskId: z.string().min(1),
+        subTasks: z
+          .array(
+            z.object({
+              title: text(200).min(1, "Enter a Sub task title"),
+              min: hoursSchema,
+              max: hoursSchema,
+              comment: text(1000).default(""),
+            }),
+          )
+          .max(200, "Use at most 200 Sub tasks per Task"),
+      }),
+    )
+    .max(1000),
+  parts: z
+    .array(
+      z.object({
+        part: partSchema,
+        deploymentMin: hoursSchema,
+        deploymentMax: hoursSchema,
+        assumptions: lines,
+        risks: lines,
+      }),
+    )
+    .max(PART_VALUES.length),
+  qaEnabled: z.boolean(),
+  qaPercent: wholePercent,
+  pmEnabled: z.boolean(),
+  pmPercent: wholePercent,
+  bugFixPercent: wholePercent,
+  hourlyRate: z.number().int().min(1).max(1000),
+  rateConfirmed: z.boolean(),
+});
+export type EstimateInput = z.input<typeof estimateSchema>;

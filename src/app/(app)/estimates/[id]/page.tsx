@@ -110,17 +110,35 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
             <span>Updated {lastActiveLabel(request.updatedAt, new Date()).toLowerCase()}</span>
           </p>
         </div>
-        {(request.canEdit || request.canDelete) && (
-          <div className="flex flex-wrap gap-2">
-            {request.canEdit && (
-              <Link href={`/estimates/${request.id}/edit?step=1`} className={ui.primaryButton}>
-                Edit
-              </Link>
-            )}
-            {request.canDelete && <DeleteDraft id={request.id} name={request.projectName} />}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/estimates/${request.id}/estimate`} className={ui.primaryButton}>
+            {request.canEdit ? "Estimate hours" : "View hours"}
+          </Link>
+          {request.canEdit && (
+            <Link href={`/estimates/${request.id}/edit?step=1`} className={ui.secondaryButton}>
+              Edit
+            </Link>
+          )}
+          {request.canDelete && <DeleteDraft id={request.id} name={request.projectName} />}
+        </div>
       </div>
+
+      <section
+        aria-label="Estimate"
+        className={`${ui.card} flex flex-wrap items-center gap-x-8 gap-y-2 px-5 py-4`}
+      >
+        <div>
+          <div className="text-sm text-muted">Total hours (min–max)</div>
+          <div className="text-2xl font-bold tabular-nums" data-testid="request-total">
+            {request.hours}
+          </div>
+        </div>
+        <div className="text-sm text-muted">
+          {request.lastExport
+            ? `Last exported by ${request.lastExport.userName} · ${lastActiveLabel(request.lastExport.createdAt, new Date()).toLowerCase()}`
+            : "Not exported yet"}
+        </div>
+      </section>
 
       {notice === "view-only" && (
         <p role="status" className="rounded-lg bg-info-bg px-3.5 py-3 text-sm text-info">

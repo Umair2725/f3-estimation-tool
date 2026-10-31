@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { nameKey } from "./options";
 import {
   fieldErrors,
+  HOURS_MESSAGE,
+  hoursSchema,
   readConsiderations,
   step1Schema,
   step2Schema,
@@ -107,5 +109,19 @@ describe("nameKey", () => {
   it("ignores case and spacing", () => {
     expect(nameKey("  Northwind   Clinics ")).toBe("northwind clinics");
     expect(nameKey("northwind clinics ")).toBe(nameKey("Northwind Clinics"));
+  });
+});
+
+describe("hours", () => {
+  it("accepts 0–9999 with one decimal", () => {
+    for (const h of [0, 12, 12.5, 9999])
+      expect(hoursSchema.safeParse(h).success, String(h)).toBe(true);
+  });
+  it("refuses negatives, two decimals and too many hours", () => {
+    for (const h of [-3, 2.25, 10000]) {
+      const result = hoursSchema.safeParse(h);
+      expect(result.success, String(h)).toBe(false);
+      expect(result.error?.issues[0].message).toBe(HOURS_MESSAGE);
+    }
   });
 });

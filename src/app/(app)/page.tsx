@@ -134,10 +134,10 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                       {row.parts.map((p) => PART_LABELS[p]).join(" · ") || "–"}
                     </td>
                     <td
-                      className="px-3 py-3 text-right tabular-nums"
-                      title="Hours arrive with the estimate"
+                      className="px-3 py-3 text-right whitespace-nowrap tabular-nums"
+                      data-testid="request-hours"
                     >
-                      –
+                      {row.hours}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap text-muted">
                       {lastActiveLabel(row.updatedAt, now)}

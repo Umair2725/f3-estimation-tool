@@ -2,7 +2,7 @@
 
 Folio3's internal tool for estimating software projects. It reuses past estimates and the hours teams really spend building features with AI. See the product brief: [docs/product-brief.md](docs/product-brief.md).
 
-> **Status:** foundation plus sign-in and roles: app shell, Google sign-in for `@folio3.com`, roles, people management, database, health check and tooling. Estimation requests (Home, the four-step wizard, the tech stack catalog) are in; hours, matching and the Excel export arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
+> **Status:** foundation plus sign-in and roles: app shell, Google sign-in for `@folio3.com`, roles, people management, database, health check and tooling. Estimation requests (Home, the four-step wizard, the tech stack catalog), hours entered by hand and the internal Excel export are in; AI matching, review and the client-facing export arrive in later changes. Work is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) in [`openspec/`](openspec/).
 
 ## Prerequisites
 
@@ -131,7 +131,7 @@ With `AUTH_DEV_LOGIN=1` (the `.env.example` default) the sign-in page also shows
 | `dev.admin@folio3.com` | Admin |
 | `dev.newcomer@folio3.com` | none (shows the waiting page) |
 
-Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), reset to the same state on every run.
+Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), two of them with sample hours, reset to the same state on every run.
 
 ## Estimation requests
 
@@ -148,13 +148,51 @@ Who can do what:
 - Everyone with a role can see every request.
 - Only the owner or an Admin can edit a request (while it's a Draft or has Changes requested) or delete a draft.
 
-Hours are added in a later release, so the Home list shows "–" for now.
-
 **Settings → Tech stack** (Admins only):
 - add technologies and choose which parts each applies to
 - retire old ones: they disappear from the wizard, but requests that already use them keep them
 
 The catalog starts with the technologies from the product brief.
+
+## Hours and the Excel export
+
+**Estimating hours.** On a request page, click **Estimate hours**:
+- Every feature is a **Task** on each part it belongs to (one tab per part).
+- Add **Sub tasks** with Min and Max hours (0–9999, one decimal) and a comment.
+- Each part also has **Deployment** hours (labelled with the request's environments), **Assumptions** and **Risks**.
+- The side panel has the overheads: **QA %** and **PM %** (each can be turned off), **bug fixing %**, the **hourly rate** from the approved list, and **Rate confirmed**.
+- Totals update as you type: each part (development + bug fixing + deployment), QA, PM, the total, and the cost at the rate.
+- **Save** stores everything. Only the owner or an Admin can change hours; everyone else sees them read-only.
+- The Home list and the request page show each request's total once it has hours.
+
+**Before you export**, a checklist warns about:
+- Min more than Max
+- Sub tasks with 0 hours
+- Tasks with no Sub tasks
+- features with no hours
+- an unconfirmed rate, or a rate that's no longer approved
+- text that names another client
+
+Warnings don't block the internal export.
+
+**Export (internal)** downloads `<project> – Estimate (internal) – <date>.xlsx`. It's built from [`docs/templates/Empty_Estimation_Sheet.xlsx`](docs/templates/Empty_Estimation_Sheet.xlsx), keeping its styles.
+- **Summary:**
+  - project details
+  - one row per development sheet, linked by formula
+  - QA and PM as percentage formulas, and a Total
+  - the hourly rate cell, with Cost (Min) and Cost (Max) formulas, so changing the rate in Excel updates the cost
+  - the special considerations from the request
+  - Resources and Weeks left blank
+- **One development sheet per part,** named like "Backend (Node.js)":
+  - Tasks and Sub tasks, with every total as a formula
+  - Bug Fixing as a % formula, Deployment, Assumptions, Risks, and the template's reference notes
+- **Left out:** the QA, GD and PM detail sheets, the unused development sheets, Research Tasks, and the **Questions sheet** (it holds another project's sample questions).
+- Exporting doesn't change the request's status. The request page shows who exported last.
+- The client-facing export arrives with review and approval.
+
+**Settings → Estimate defaults** (Admins only):
+- what new requests start from: QA 25%, PM 30%, bug fixing 10%, default rate $30, approved rates $25–$50
+- changes apply to requests created afterwards
 
 ## Scripts
 
