@@ -39,7 +39,7 @@
 
 - [x] 7.1 Add a Playwright setup project that signs in once per role with dev sign-in and saves the storage state; update the existing app-shell tests to use it; verify `npm run test:e2e` passes locally with all old and new tests
 - [x] 7.2 Update `README.md`: sign-in overview, roles table, new settings, how to create the Google OAuth client (Internal consent screen, redirect URI `…/api/auth/callback/google`), the first-Admin setup via `ADMIN_EMAILS`, and dev sign-in plus seeding; verify a reader can follow it to sign in locally with dev sign-in from a fresh clone
-- [ ] 7.3 Ensure CI runs migrations, seed, unit and integration tests and e2e with `AUTH_DEV_LOGIN=1`; verify the workflow is green on the pull request
+- [x] 7.3 Ensure CI runs migrations, seed, unit and integration tests and e2e with `AUTH_DEV_LOGIN=1`; verify the workflow is green on the pull request
 
 ## 8. Google sign-in on a real client (manual, needs the OAuth client)
 
