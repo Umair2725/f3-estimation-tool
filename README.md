@@ -210,8 +210,30 @@ Warnings don't block the internal export.
 | `db:migrate` | Create and apply a new migration during development |
 | `db:generate` | Regenerate the Prisma client (also runs after `npm ci`) |
 | `db:studio` | Browse the database |
+| `parse-estimate` | Read a local estimate `.xlsx` and print what the parser finds (see below). Nothing is uploaded or stored |
 
 First time running end-to-end tests: `npx.cmd playwright install chromium`.
+
+## Reading past estimate files
+
+The parser in `src/server/estimate-parser/` reads Folio3 estimate workbooks, including old ones whose sheets and rows don't match the template. The historical import and actual-hours upload will build on it.
+- **Reads by labels, not cell positions:** it classifies sheets by name and finds the S.No / Task / Minimum / Maximum header wherever it is.
+- **Recalculates hours from the Sub tasks:** where the file's own totals differ, it warns and shows both numbers.
+- **Skips leftovers:** template placeholders and skeleton sheets.
+
+To check a real file locally, put it in `samples/`, which git ignores, and run:
+
+```powershell
+npm.cmd run parse-estimate -- "samples/Some estimate.xlsx"
+```
+
+You'll get:
+- each sheet and the part it was classified as
+- Task and Sub task counts and hours
+- the Summary details: project, client, QA %, PM %
+- every warning
+
+Add `--json` for the full result. `npm.cmd test` also parses every file in `samples/`, as a smoke test that's skipped when the folder is empty.
 
 ## Client data: never commit it
 

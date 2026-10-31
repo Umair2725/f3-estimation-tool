@@ -108,14 +108,38 @@ const SAMPLE_REQUESTS: SampleRequest[] = [
         name: "Patient sign up & sign in",
         description: "Email and Google sign-in, forgot password",
         parts: ["WEB_FRONTEND", "MOBILE", "BACKEND"],
+        hours: {
+          BACKEND: [
+            ["Auth API and sessions", 10, 14],
+            ["Google sign-in", 4, 6],
+          ],
+          WEB_FRONTEND: [["Sign-up and sign-in screens", 8, 12]],
+          MOBILE: [["Sign-up and sign-in screens", 10, 14]],
+        },
       },
       {
         name: "Appointment booking",
         description: "Doctor availability, reminders",
         parts: ["WEB_FRONTEND", "BACKEND"],
+        hours: {
+          BACKEND: [
+            ["Booking API", 12, 16],
+            ["Reminder emails", 6, 8],
+          ],
+          WEB_FRONTEND: [["Booking calendar", 14, 20]],
+        },
       },
-      { name: "Lab results", parts: ["MOBILE", "BACKEND"] },
+      {
+        name: "Lab results",
+        parts: ["MOBILE", "BACKEND"],
+        hours: {
+          BACKEND: [["Results API", 8, 12]],
+          MOBILE: [["Results list and detail", 10, 14]],
+        },
+      },
     ],
+    deployment: { BACKEND: [16, 24], WEB_FRONTEND: [4, 8], MOBILE: [8, 12] },
+    assumptions: { BACKEND: ["Lab results come from the client's existing system via an API"] },
   },
   {
     projectName: "Fleet tracking dashboard",
@@ -147,9 +171,17 @@ const SAMPLE_REQUESTS: SampleRequest[] = [
         name: "Work orders",
         description: "Assign, update and close jobs offline",
         parts: ["MOBILE", "BACKEND"],
+        hours: {
+          BACKEND: [["Work order API and sync", 16, 24]],
+          MOBILE: [
+            ["Job list and detail", 12, 16],
+            ["Offline sync", 16, 24],
+          ],
+        },
       },
-      { name: "Photo capture", parts: ["MOBILE"] },
+      { name: "Photo capture", parts: ["MOBILE"], hours: { MOBILE: [["Camera and upload", 6, 10]] } },
     ],
+    deployment: { BACKEND: [12, 16], MOBILE: [8, 12] },
   },
 ];
 
@@ -201,7 +233,12 @@ async function seedRequests() {
           })),
         },
         features: {
-          create: sample.features.map((f, position) => ({ ...f, position })),
+          create: sample.features.map(({ name, description, parts }, position) => ({
+            name,
+            description,
+            parts,
+            position,
+          })),
         },
       },
     });
