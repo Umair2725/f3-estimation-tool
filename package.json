@@ -20,6 +20,7 @@
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
     "db:seed": "tsx prisma/seed.ts",
+    "parse-estimate": "tsx scripts/parse-estimate.ts",
     "test:int": "vitest run --project integration"
   },
   "dependencies": {
