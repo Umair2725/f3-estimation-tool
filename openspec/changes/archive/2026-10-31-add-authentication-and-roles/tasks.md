@@ -44,10 +44,12 @@
 ## 8. Google sign-in on a real client (manual, needs the OAuth client)
 
 - [ ] 8.1 The product owner or Folio3 IT creates a Google OAuth client (Internal) for `http://localhost:3000` and puts the ID and secret in `.env`; verify manually: a `@folio3.com` account signs in and lands on the waiting page (or Admin if in `ADMIN_EMAILS`), a personal Gmail account is refused with "Only @folio3.com accounts can sign in", and sign-out works
+  - **Deferred at archive (2026-10-31, product owner decision):** the Google OAuth client hasn't been created yet. Google sign-in stays disabled ("isn't configured on this server yet") until it is; the README has the steps. Re-check the three manual scenarios once the client exists.
 
 ## 9. Integration check
 
 - [ ] 9.1 From a fresh clone: `docker compose up --build`, seed, sign in as each dev role and walk the spec scenarios (redirects, navigation per role, people management, deactivation, sign-out, phone width, dark mode); confirm CI is green and record the results in the pull request description
+  - **Deferred at archive (2026-10-31):** CI and the e2e suite cover the spec scenarios with dev sign-in; the `docker compose up` walkthrough needs the Google client settings (production mode), so it waits for 8.1.
 
 ## Workflow follow-up
 
