@@ -179,7 +179,11 @@ const SAMPLE_REQUESTS: SampleRequest[] = [
           ],
         },
       },
-      { name: "Photo capture", parts: ["MOBILE"], hours: { MOBILE: [["Camera and upload", 6, 10]] } },
+      {
+        name: "Photo capture",
+        parts: ["MOBILE"],
+        hours: { MOBILE: [["Camera and upload", 6, 10]] },
+      },
     ],
     deployment: { BACKEND: [12, 16], MOBILE: [8, 12] },
   },
