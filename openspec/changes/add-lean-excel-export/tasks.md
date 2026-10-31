@@ -32,7 +32,7 @@
 ## 6. Docs, seed and CI
 
 - [x] 6.1 Give the seed's sample requests Sub tasks, Deployment and assumptions, so a fresh demo has totals and a useful export; update `README.md` (estimate hours, overheads and defaults, the checklist, what the export contains and leaves out, how to open the report); verify the seed stays idempotent and a reader can export from a fresh clone
-- [ ] 6.2 Verify CI is green on the pull request
+- [x] 6.2 Verify CI is green on the pull request
 
 ## 7. Integration check
 
