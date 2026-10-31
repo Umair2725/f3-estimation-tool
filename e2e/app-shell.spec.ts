@@ -1,11 +1,17 @@
 import { expect, test } from "@playwright/test";
+import { authFile } from "./helpers";
 
-// specs/app-shell
+// specs/app-shell, signed in as the dev Admin.
+test.use({ storageState: authFile("admin") });
 
 test("home page shows the header, title, purpose and coming-soon notice", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("header")).toContainText("F3 Estimation Tool");
-  await expect(page.locator("header")).toContainText("Folio3");
+  const header = page.locator("header");
+  await expect(header).toContainText("F3 Estimation Tool");
+  await expect(header).toContainText("Folio3");
+  await expect(page.getByTestId("person-name")).toHaveText("Dev Admin");
+  await expect(page.getByTestId("person-role")).toHaveText("Admin");
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "F3 Estimation Tool" })).toBeVisible();
   await expect(page.getByText(/reusing Folio3's past estimates/)).toBeVisible();
   await expect(page.getByRole("status")).toContainText("coming soon");
@@ -32,14 +38,27 @@ test("a rendering error shows a friendly page without internal details", async (
   expect(text).not.toMatch(/at \S+ \(/); // no stack trace lines
 });
 
-test("home page has no horizontal scroll at phone width (375 px)", async ({ page }) => {
+test("at phone width the navigation hides behind a menu button, without horizontal scroll", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/");
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  for (const path of ["/", "/settings/people"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
+
+  const settings = page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("link", { name: "Settings" });
+  await expect(settings).not.toBeInViewport();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await expect(settings).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(settings).not.toBeInViewport();
 });
 
 test("layout follows the dark color scheme preference", async ({ page }) => {
@@ -49,10 +68,10 @@ test("layout follows the dark color scheme preference", async ({ page }) => {
     const style = getComputedStyle(document.body);
     return { background: style.backgroundColor, color: style.color };
   });
-  expect(colors.background).toBe("rgb(18, 18, 22)");
-  expect(colors.color).toBe("rgb(236, 236, 241)");
+  expect(colors.background).toBe("rgb(20, 21, 23)");
+  expect(colors.color).toBe("rgb(241, 241, 242)");
 
   await page.emulateMedia({ colorScheme: "light" });
   const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  expect(light).toBe("rgb(247, 247, 248)");
+  expect(light).toBe("rgb(250, 250, 250)");
 });
