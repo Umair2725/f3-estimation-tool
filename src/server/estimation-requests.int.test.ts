@@ -298,3 +298,102 @@ describe("home list (specs/home-screen)", () => {
     expect(drafts.latest).toMatchObject({ id, projectName: `Newer ${tag}`, lastStep: 3 });
   });
 });
+
+describe("estimate Tasks follow scope (specs/estimate-hours)", () => {
+  async function tasksOf(requestId: string) {
+    const tasks = await getDb().estimateTask.findMany({
+      where: { feature: { requestId } },
+      include: { feature: true, requestPart: true, subTasks: true },
+    });
+    return tasks
+      .map((t) => ({
+        feature: t.feature.name,
+        part: t.requestPart.part,
+        subTasks: t.subTasks.length,
+      }))
+      .sort((a, b) => `${a.feature}${a.part}`.localeCompare(`${b.feature}${b.part}`));
+  }
+
+  it("creates one Task per feature and part, and keeps Sub tasks through renames and reorders", async () => {
+    const sara = await person();
+    const { id } = await createRequest(sara, step1(`Tasks ${tag}`));
+    await saveStep(
+      sara,
+      id,
+      2,
+      step2([
+        { part: "BACKEND", technologyIds: [tech["Node.js"]] },
+        { part: "MOBILE", technologyIds: [tech["Flutter"]] },
+      ]),
+    );
+    await saveStep(sara, id, 4, {
+      features: [
+        { name: "Booking", parts: ["BACKEND", "MOBILE"] },
+        { name: "Photos", parts: ["MOBILE"] },
+      ],
+    });
+    expect(await tasksOf(id)).toEqual([
+      { feature: "Booking", part: "BACKEND", subTasks: 0 },
+      { feature: "Booking", part: "MOBILE", subTasks: 0 },
+      { feature: "Photos", part: "MOBILE", subTasks: 0 },
+    ]);
+
+    // Give the Backend Booking task a Sub task, then rename and reorder via the wizard.
+    const backendBooking = await getDb().estimateTask.findFirstOrThrow({
+      where: { feature: { requestId: id, name: "Booking" }, requestPart: { part: "BACKEND" } },
+    });
+    await getDb().subTask.create({
+      data: {
+        taskId: backendBooking.id,
+        title: "API",
+        minTenths: 120,
+        maxTenths: 160,
+        position: 0,
+      },
+    });
+    const features = await getDb().feature.findMany({
+      where: { requestId: id },
+      orderBy: { position: "asc" },
+    });
+    await saveStep(sara, id, 4, {
+      features: [
+        { key: features[1].id, name: "Photos", parts: ["MOBILE"] },
+        { key: features[0].id, name: "Appointment booking", parts: ["BACKEND", "MOBILE"] },
+        { key: "new-1", name: "Reminders", parts: ["BACKEND"] },
+      ],
+    });
+    expect(await tasksOf(id)).toEqual([
+      { feature: "Appointment booking", part: "BACKEND", subTasks: 1 },
+      { feature: "Appointment booking", part: "MOBILE", subTasks: 0 },
+      { feature: "Photos", part: "MOBILE", subTasks: 0 },
+      { feature: "Reminders", part: "BACKEND", subTasks: 0 },
+    ]);
+  });
+
+  it("removes Tasks when a feature loses a part or the part is removed", async () => {
+    const sara = await person();
+    const { id } = await createRequest(sara, step1(`Task removal ${tag}`));
+    await saveStep(
+      sara,
+      id,
+      2,
+      step2([
+        { part: "BACKEND", technologyIds: [tech["Node.js"]] },
+        { part: "MOBILE", technologyIds: [tech["Flutter"]] },
+      ]),
+    );
+    await saveStep(sara, id, 4, { features: [{ name: "Booking", parts: ["BACKEND", "MOBILE"] }] });
+    const [feature] = await getDb().feature.findMany({ where: { requestId: id } });
+
+    await saveStep(sara, id, 4, {
+      features: [{ key: feature.id, name: "Booking", parts: ["BACKEND"] }],
+    });
+    expect(await tasksOf(id)).toEqual([{ feature: "Booking", part: "BACKEND", subTasks: 0 }]);
+
+    await saveStep(sara, id, 4, {
+      features: [{ key: feature.id, name: "Booking", parts: ["BACKEND", "MOBILE"] }],
+    });
+    await saveStep(sara, id, 2, step2([{ part: "MOBILE", technologyIds: [tech["Flutter"]] }]));
+    expect(await tasksOf(id)).toEqual([{ feature: "Booking", part: "MOBILE", subTasks: 0 }]);
+  });
+});

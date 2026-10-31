@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/settings/people", label: "People and roles" },
   { href: "/settings/tech-stack", label: "Tech stack" },
+  { href: "/settings/estimate-defaults", label: "Estimate defaults" },
 ];
 
 export function SettingsTabs() {

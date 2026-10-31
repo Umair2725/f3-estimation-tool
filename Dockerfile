@@ -48,6 +48,8 @@ ENV NODE_ENV=production \
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
+# Folio3's Excel template, read at runtime by the export (specs/excel-export).
+COPY --chown=node:node docs/templates/Empty_Estimation_Sheet.xlsx ./docs/templates/Empty_Estimation_Sheet.xlsx
 # Startup settings check (runs with Node's built-in TypeScript support).
 COPY --chown=node:node scripts/check-env.ts ./scripts/check-env.ts
 COPY --chown=node:node src/lib/env-schema.ts ./src/lib/env-schema.ts

@@ -5,6 +5,7 @@ import { can } from "@/server/auth/permissions";
 import { getDb } from "@/server/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { checkCompleteness, type MissingItem } from "@/lib/estimation/completeness";
+import { computeTotals, formatRange } from "@/lib/estimation/totals";
 import { PAGE_SIZE, type RequestFilters } from "@/lib/estimation/filters";
 import {
   nameKey,
@@ -23,6 +24,7 @@ import {
   step4Schema,
   type Considerations,
 } from "@/lib/estimation/schemas";
+import { readDefaults } from "./estimate-defaults";
 import { assertAccess, ServiceError } from "./service-error";
 
 // Estimation requests (specs/estimation-requests, specs/home-screen). Every function checks the
@@ -65,7 +67,7 @@ async function upsertClient(tx: Tx, name: string): Promise<string | null> {
 }
 
 /** Loads a request for a change, refusing (404/403) before anything is written. */
-async function loadForEdit(tx: Tx, actor: CurrentUser, id: string) {
+export async function loadForEdit(tx: Tx, actor: CurrentUser, id: string) {
   const request = await tx.estimationRequest.findUnique({
     where: { id },
     include: { parts: { include: { technologies: true } }, features: true },
@@ -84,6 +86,7 @@ export async function createRequest(actor: CurrentUser | null, input: unknown) {
   assertAccess(actor, "estimate.edit");
   const step1 = parse(step1Schema, input);
   return getDb().$transaction(async (tx) => {
+    const defaults = await readDefaults(tx);
     const request = await tx.estimationRequest.create({
       data: {
         projectName: step1.projectName,
@@ -92,6 +95,10 @@ export async function createRequest(actor: CurrentUser | null, input: unknown) {
         projectDate: new Date(step1.projectDate),
         ownerId: actor.id,
         lastStep: 1,
+        qaPercent: defaults.qaPercent,
+        pmPercent: defaults.pmPercent,
+        bugFixPercent: defaults.bugFixPercent,
+        hourlyRate: defaults.defaultRate,
       },
     });
     return { id: request.id, savedAt: request.updatedAt };
@@ -110,6 +117,7 @@ export async function saveStep(actor: CurrentUser | null, id: string, step: Step
         data: { considerations: parse(step3Schema, input) },
       });
     } else await saveFeatures(tx, request, input);
+    if (step === 2 || step === 4) await syncTasks(tx, id);
 
     const saved = await tx.estimationRequest.update({ where: { id }, data: { lastStep: step } });
     return { savedAt: saved.updatedAt };
@@ -202,16 +210,48 @@ async function saveFeatures(tx: Tx, request: LoadedRequest, input: unknown) {
       });
     }
   });
-  await tx.feature.deleteMany({ where: { requestId: request.id } });
-  if (features.length) {
-    await tx.feature.createMany({
-      data: features.map((f, position) => ({
-        requestId: request.id,
-        name: f.name,
-        description: f.description || null,
-        parts: f.parts,
-        position,
-      })),
+  // Update features by id, so their estimate Tasks and Sub tasks survive renames and reorders.
+  const existing = new Set(request.features.map((f) => f.id));
+  const kept = new Set<string>();
+  for (const [position, f] of features.entries()) {
+    const data = { name: f.name, description: f.description || null, parts: f.parts, position };
+    if (f.key && existing.has(f.key) && !kept.has(f.key)) {
+      kept.add(f.key);
+      await tx.feature.update({ where: { id: f.key }, data });
+    } else {
+      const created = await tx.feature.create({ data: { ...data, requestId: request.id } });
+      kept.add(created.id);
+    }
+  }
+  await tx.feature.deleteMany({ where: { requestId: request.id, id: { notIn: [...kept] } } });
+}
+
+/**
+ * Makes the estimate Tasks match the scope (specs/estimate-hours): one Task per feature and
+ * part. Tasks whose feature lost that part go (with their Sub tasks); missing ones are added.
+ */
+export async function syncTasks(tx: Tx, requestId: string) {
+  // Sequential: queries inside an interactive transaction share one connection.
+  const features = await tx.feature.findMany({ where: { requestId } });
+  const parts = await tx.requestPart.findMany({ where: { requestId } });
+  const tasks = await tx.estimateTask.findMany({ where: { feature: { requestId } } });
+  const partId = new Map(parts.map((p) => [p.part, p.id]));
+  const wanted = new Set(
+    features.flatMap((f) =>
+      f.parts.filter((p) => partId.has(p)).map((p) => `${f.id}:${partId.get(p)}`),
+    ),
+  );
+  const stale = tasks.filter((t) => !wanted.has(`${t.featureId}:${t.requestPartId}`));
+  if (stale.length)
+    await tx.estimateTask.deleteMany({ where: { id: { in: stale.map((t) => t.id) } } });
+  const have = new Set(tasks.map((t) => `${t.featureId}:${t.requestPartId}`));
+  const missing = [...wanted].filter((k) => !have.has(k));
+  if (missing.length) {
+    await tx.estimateTask.createMany({
+      data: missing.map((k) => {
+        const [featureId, requestPartId] = k.split(":");
+        return { featureId, requestPartId };
+      }),
     });
   }
 }
@@ -236,6 +276,9 @@ export type RequestDetail = {
   updatedAt: Date;
   canEdit: boolean;
   canDelete: boolean;
+  /** Grand total "195–276", or "–" before any hours. */
+  hours: string;
+  lastExport: { userName: string; createdAt: Date } | null;
   missing: MissingItem[];
 };
 
@@ -246,7 +289,17 @@ export async function getRequest(actor: CurrentUser | null, id: string): Promise
     include: {
       client: true,
       owner: { select: { id: true, name: true } },
-      parts: { include: { technologies: { include: { technology: true } } } },
+      parts: {
+        include: {
+          technologies: { include: { technology: true } },
+          tasks: { select: { subTasks: { select: { minTenths: true, maxTenths: true } } } },
+        },
+      },
+      exports: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { user: { select: { name: true } } },
+      },
       features: { orderBy: { position: "asc" } },
     },
   });
@@ -289,6 +342,10 @@ export async function getRequest(actor: CurrentUser | null, id: string): Promise
     updatedAt: request.updatedAt,
     canEdit: canEditRequest(actor, request),
     canDelete: canDeleteRequest(actor, request),
+    hours: requestHours(request),
+    lastExport: request.exports[0]
+      ? { userName: request.exports[0].user.name, createdAt: request.exports[0].createdAt }
+      : null,
     missing: checkCompleteness({
       clientName: request.client?.name ?? null,
       parts: parts.map((p) => ({ part: p.part, technologyCount: p.technologies.length })),
@@ -329,6 +386,8 @@ export type RequestListRow = {
   status: RequestStatus;
   ownerName: string;
   parts: Part[];
+  /** Grand total "195–276", or "–" before any Sub task hours (specs/estimate-hours). */
+  hours: string;
   updatedAt: Date;
 };
 
@@ -365,7 +424,14 @@ export async function listRequests(actor: CurrentUser | null, filters: RequestFi
       include: {
         client: { select: { name: true } },
         owner: { select: { name: true } },
-        parts: { select: { part: true } },
+        parts: {
+          select: {
+            part: true,
+            deploymentMinTenths: true,
+            deploymentMaxTenths: true,
+            tasks: { select: { subTasks: { select: { minTenths: true, maxTenths: true } } } },
+          },
+        },
       },
     }),
   ]);
@@ -382,6 +448,7 @@ export async function listRequests(actor: CurrentUser | null, filters: RequestFi
       parts: r.parts
         .map((p) => p.part)
         .sort((a, b) => PART_VALUES.indexOf(a) - PART_VALUES.indexOf(b)),
+      hours: requestHours(r),
       updatedAt: r.updatedAt,
     })),
   };
@@ -426,4 +493,29 @@ export async function myDrafts(actor: CurrentUser | null) {
       updatedAt: latest.updatedAt,
     },
   };
+}
+
+/** The grand total of a request for lists: "195–276", or "–" without Sub task hours. */
+export function requestHours(request: {
+  qaEnabled: boolean;
+  qaPercent: number;
+  pmEnabled: boolean;
+  pmPercent: number;
+  bugFixPercent: number;
+  hourlyRate: number;
+  parts: {
+    part: string;
+    deploymentMinTenths: number;
+    deploymentMaxTenths: number;
+    tasks: { subTasks: { minTenths: number; maxTenths: number }[] }[];
+  }[];
+}): string {
+  const totals = computeTotals({
+    parts: request.parts,
+    qa: { enabled: request.qaEnabled, percent: request.qaPercent },
+    pm: { enabled: request.pmEnabled, percent: request.pmPercent },
+    bugFixPercent: request.bugFixPercent,
+    rate: request.hourlyRate,
+  });
+  return formatRange(totals.total, totals.hasHours);
 }

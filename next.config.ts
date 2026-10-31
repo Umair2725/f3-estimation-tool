@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   // NEXT_OUTPUT_STANDALONE=1). Local `npm start` uses the normal build.
   output: process.env.NEXT_OUTPUT_STANDALONE === "1" ? "standalone" : undefined,
   cacheComponents: true,
+  // The export reads Folio3's Excel template at runtime (specs/excel-export).
+  outputFileTracingIncludes: {
+    "/estimates/[id]/export": ["./docs/templates/Empty_Estimation_Sheet.xlsx"],
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
