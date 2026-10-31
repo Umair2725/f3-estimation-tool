@@ -19,7 +19,7 @@
 
 ## 4. CI
 
-- [ ] 4.1 Verify CI is green on the pull request
+- [x] 4.1 Verify CI is green on the pull request
 
 ## Workflow follow-up
 
