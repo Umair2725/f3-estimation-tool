@@ -47,3 +47,16 @@ describe("import entry (specs/historical-import)", () => {
     expect(item("ARCHITECT")).toBeUndefined();
   });
 });
+
+describe("Reviews entry (specs/estimate-review)", () => {
+  const item = (role: Parameters<typeof navFor>[0], reviews?: number) =>
+    navFor(role, { reviews })
+      .flatMap((g) => g.items)
+      .find((i) => i.label === "Reviews");
+  it("links Tech Leads and Architects to /reviews with the waiting count", () => {
+    expect(item("TECH_LEAD", 2)).toEqual({ label: "Reviews", href: "/reviews", count: 2 });
+    expect(item("ARCHITECT")).toMatchObject({ href: "/reviews", count: 0 });
+    expect(item("ESTIMATOR", 3)).toBeUndefined();
+    expect(item("ADMIN", 3)).toBeUndefined();
+  });
+});

@@ -6,6 +6,7 @@ import { readConsiderations } from "@/lib/estimation/schemas";
 import { getEstimate } from "../estimates";
 import { getRequest } from "../estimation-requests";
 import { assertAccess } from "../service-error";
+import { isApproved } from "@/lib/review/transitions";
 import { buildWorkbook, type ExportData } from "./workbook";
 
 // The internal export (specs/excel-export): anyone with a role who can view the request.
@@ -44,6 +45,7 @@ export async function exportInternal(actor: CurrentUser | null, id: string, now 
     pm: { enabled: estimate.overheads.pmEnabled, percent: estimate.overheads.pmPercent },
     bugFixPercent: estimate.overheads.bugFixPercent,
     rate: estimate.overheads.hourlyRate,
+    draft: !isApproved(request.status),
   };
   const { buffer } = await buildWorkbook(data);
   const fileName = exportFileName(request.projectName, now.toISOString().slice(0, 10));

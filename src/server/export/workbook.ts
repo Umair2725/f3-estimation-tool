@@ -56,6 +56,8 @@ export type ExportData = {
   pm: { enabled: boolean; percent: number };
   bugFixPercent: number;
   rate: number;
+  /** Not Approved: the Summary is marked "DRAFT – not approved" (specs/estimate-review). */
+  draft?: boolean;
 };
 type Nfr = { enabled: boolean; note: string };
 
@@ -318,6 +320,8 @@ const yesNo = (n: Nfr | undefined) => (n?.enabled ? "Yes" : "No");
 const singleMultiple = (items: string[]) =>
   items.length === 0 ? null : items.length === 1 ? "Single" : "Multiple";
 
+export const DRAFT_WATERMARK = "DRAFT – not approved";
+
 function writeSummary(ws: ExcelJS.Worksheet, data: ExportData, sheets: string[], totals: Totals) {
   const row11 = readRow(ws, 11);
   const row16 = readRow(ws, 16);
@@ -332,6 +336,16 @@ function writeSummary(ws: ExcelJS.Worksheet, data: ExportData, sheets: string[],
   }
 
   ws.getCell("B2").value = data.projectName;
+  if (data.draft) {
+    // B4 is empty in the template; the watermark changes no totals or formulas.
+    const mark = ws.getCell("B4");
+    mark.value = DRAFT_WATERMARK;
+    mark.font = { bold: true, size: 14, color: { argb: "FFC00000" } };
+    ws.headerFooter = {
+      ...ws.headerFooter,
+      oddHeader: `&C&"-,Bold"&KC00000${DRAFT_WATERMARK}`,
+    };
+  }
   ws.getCell("C5").value = data.clientName ?? null;
   ws.getCell("C6").value = data.projectManager || null;
   ws.getCell("C7").value = new Date(`${data.projectDate}T00:00:00Z`);

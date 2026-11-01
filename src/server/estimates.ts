@@ -1,12 +1,13 @@
 import "server-only";
 import type { CurrentUser } from "@/server/auth/access";
 import { getDb } from "@/server/db";
-import { PART_LABELS, PART_VALUES, type Part, type RequestStatus } from "@/lib/estimation/options";
+import { PART_VALUES, type Part, type RequestStatus } from "@/lib/estimation/options";
 import { estimateSchema, fieldErrors, readConsiderations } from "@/lib/estimation/schemas";
 import { buildChecklist } from "@/lib/estimation/checklist";
 import { computeTotals, toTenths, type Totals, type TotalsInput } from "@/lib/estimation/totals";
 import { readDefaults } from "./estimate-defaults";
 import { canEditRequest, loadForEdit, syncTasks } from "./estimation-requests";
+import { partLabel } from "./review/snapshot-source";
 import { assertAccess, ServiceError } from "./service-error";
 
 // Hours, part extras and overheads of a request (specs/estimate-hours). Everyone with a role can
@@ -46,7 +47,14 @@ export type EstimateView = {
       featureId: string;
       featureName: string;
       featureDescription: string;
-      subTasks: { title: string; min: number; max: number; comment: string; source?: string }[];
+      subTasks: {
+        id?: string; // set when loaded; absent on input
+        title: string;
+        min: number;
+        max: number;
+        comment: string;
+        source?: string;
+      }[];
     }[];
   }[];
   features: { id: string; name: string; description: string; parts: Part[] }[];
@@ -56,12 +64,7 @@ export type EstimateView = {
   lastExport: { userName: string; createdAt: Date; fileName: string } | null;
 };
 
-/** "Backend (Node.js, Python)": the development sheet's name before Excel's limits. */
-export function partLabel(part: Part, technologies: string[]): string {
-  return technologies.length
-    ? `${PART_LABELS[part]} (${technologies.join(", ")})`
-    : PART_LABELS[part];
-}
+export { partLabel };
 
 export async function getEstimate(actor: CurrentUser | null, id: string): Promise<EstimateView> {
   assertAccess(actor);
@@ -118,6 +121,7 @@ export async function getEstimate(actor: CurrentUser | null, id: string): Promis
             featureName: feature.name,
             featureDescription: feature.description ?? "",
             subTasks: t.subTasks.map((s) => ({
+              id: s.id,
               title: s.title,
               min: hours(s.minTenths),
               max: hours(s.maxTenths),
@@ -218,18 +222,31 @@ export async function saveEstimate(actor: CurrentUser | null, id: string, input:
       if (!taskIds.has(task.taskId)) {
         throw new ServiceError("The scope changed while you were editing. Reload the page.", 409);
       }
-      await tx.subTask.deleteMany({ where: { taskId: task.taskId } });
-      if (task.subTasks.length) {
-        await tx.subTask.createMany({
-          data: task.subTasks.map((s, position) => ({
-            taskId: task.taskId,
-            title: s.title,
-            minTenths: toTenths(s.min),
-            maxTenths: toTenths(s.max),
-            comment: s.comment,
-            position,
-          })),
-        });
+      // Update Sub tasks in place by id; create new ones; delete only those removed.
+      const existing = new Map(
+        (await tx.subTask.findMany({ where: { taskId: task.taskId } })).map((s) => [s.id, s]),
+      );
+      const kept = new Set(
+        task.subTasks.flatMap((s) => (s.id && existing.has(s.id) ? [s.id] : [])),
+      );
+      await tx.subTask.deleteMany({ where: { taskId: task.taskId, id: { notIn: [...kept] } } });
+      for (const [position, s] of task.subTasks.entries()) {
+        const data = {
+          title: s.title,
+          minTenths: toTenths(s.min),
+          maxTenths: toTenths(s.max),
+          comment: s.comment,
+          position,
+        };
+        const before = s.id ? existing.get(s.id) : undefined;
+        if (s.id && before && kept.has(s.id)) {
+          const same = (Object.keys(data) as (keyof typeof data)[]).every(
+            (k) => before[k] === data[k],
+          );
+          if (!same) await tx.subTask.update({ where: { id: s.id }, data });
+        } else {
+          await tx.subTask.create({ data: { taskId: task.taskId, ...data } });
+        }
       }
     }
 

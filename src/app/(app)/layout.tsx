@@ -4,6 +4,7 @@ import { navFor } from "@/components/shell/nav";
 import { SignOutButton } from "@/components/shell/sign-out-button";
 import { ROLE_LABELS } from "@/server/auth/permissions";
 import { requireUser } from "@/server/auth/session";
+import { reviewCount } from "@/server/review";
 
 // Every page in this group needs a signed-in person, so it renders per request.
 export const instant = false;
@@ -16,7 +17,7 @@ export default async function SignedInLayout({ children }: LayoutProps<"/">) {
 
   return (
     <AppShell
-      nav={navFor(user.role)}
+      nav={navFor(user.role, { reviews: await reviewCount(user) })}
       person={{ name: user.name, email: user.email, roleLabel: ROLE_LABELS[user.role] }}
     >
       {children}

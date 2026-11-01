@@ -122,6 +122,8 @@ export const estimateSchema = z.object({
         subTasks: z
           .array(
             z.object({
+              // Existing Sub tasks keep their id, so comments and actual hours stay attached.
+              id: z.string().optional(),
               title: text(200).min(1, "Enter a Sub task title"),
               min: hoursSchema,
               max: hoursSchema,

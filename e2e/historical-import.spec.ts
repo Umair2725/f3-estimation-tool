@@ -74,9 +74,14 @@ test.describe("as an Admin", () => {
     await expect(portalRow).toContainText("1 sheet(s) need a part");
     await portalRow.getByRole("link", { name: "Check" }).click();
 
-    await page.getByLabel("Part for sheet MVP").selectOption("WEB_FRONTEND");
+    // Retried: a change made before the page hydrates is lost and leaves Save disabled.
+    const save = page.getByRole("button", { name: "Save changes" });
+    await expect(async () => {
+      await page.getByLabel("Part for sheet MVP").selectOption("WEB_FRONTEND");
+      await expect(save).toBeEnabled({ timeout: 1000 });
+    }).toPass();
     await page.getByLabel("Include Sample row").first().uncheck();
-    await page.getByRole("button", { name: "Save changes" }).click();
+    await save.click();
     await expect(page.getByRole("status").filter({ hasText: "Changes saved." })).toBeVisible();
     await page.getByRole("button", { name: "Approve and import" }).click();
     await expect(page.getByText("This project was imported")).toBeVisible();
