@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/server/auth/session";
 import { getEstimate } from "@/server/estimates";
+import { getMatching } from "@/server/matching/matching";
 import { getReviewPanel, listComments } from "@/server/review";
+import { FindAllMatches } from "./find-all-matches";
 import { ServiceError } from "@/server/service-error";
 import { EstimateEditor } from "./estimate-editor";
 
@@ -17,7 +19,15 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
     if (err instanceof ServiceError && err.status === 404) notFound();
     throw err;
   });
-  const [panel, comments] = await Promise.all([getReviewPanel(user, id), listComments(user, id)]);
+  const [panel, comments, matching] = await Promise.all([
+    getReviewPanel(user, id),
+    listComments(user, id),
+    getMatching(user, id),
+  ]);
+  // Remount the editor when an accepted suggestion replaced Sub tasks on the server.
+  const decided = Object.values(matching.byTask)
+    .map((t) => t.suggestion?.decidedAt?.getTime() ?? 0)
+    .reduce((a, b) => Math.max(a, b), 0);
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -34,9 +44,12 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
         <h1 className="mt-1 text-2xl font-bold tracking-tight break-words">
           {view.request.canEdit ? "Estimate hours" : "Hours"}: {view.request.projectName}
         </h1>
-        <p className="mt-1.5 text-foreground-2">
-          {view.request.clientName ?? "No client yet"} · Owner: {view.request.ownerName}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-foreground-2">
+            {view.request.clientName ?? "No client yet"} · Owner: {view.request.ownerName}
+          </p>
+          {matching.canEdit && <FindAllMatches requestId={id} />}
+        </div>
         {!view.request.canEdit && (
           <p role="status" className="mt-3 rounded-lg bg-info-bg px-3.5 py-3 text-sm text-info">
             {panel.status === "IN_REVIEW" ||
@@ -48,9 +61,10 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
         )}
       </div>
       <EstimateEditor
-        key={id}
+        key={`${id}:${decided}`}
         view={view}
         review={{ requestId: id, comments, canComment: panel.can.comment }}
+        matching={matching}
       />
     </div>
   );

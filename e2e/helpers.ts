@@ -18,11 +18,20 @@ export type TestRole = keyof typeof USERS;
 
 export const authFile = (role: TestRole) => `playwright/.auth/${role}.json`;
 
-/** Brings the dev users back to their seeded roles and status. */
-export function seed() {
+/**
+ * Brings the dev users back to their seeded roles and status. `usersOnly` leaves the sample
+ * requests (and the matching index) alone, so specs running in parallel aren't disturbed.
+ */
+export function seed(options: { usersOnly?: boolean } = {}) {
   execSync("npm run db:seed", {
     stdio: "pipe",
-    env: { ...process.env, NODE_ENV: "test", AUTH_DEV_LOGIN: "1" },
+    env: {
+      ...process.env,
+      NODE_ENV: "test",
+      AUTH_DEV_LOGIN: "1",
+      EMBEDDINGS_PROVIDER: "stub",
+      ...(options.usersOnly ? { SEED_USERS_ONLY: "1" } : {}),
+    },
   });
 }
 

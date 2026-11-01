@@ -21,6 +21,8 @@ const RULES = {
   // Record actual hours and set a project's outcome (specs/actual-hours, specs/project-outcome).
   "actuals.record": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
   "outcome.set": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
+  // Add reference hours for a feature with no reliable match (specs/feature-matching).
+  "reference.provide": ["ARCHITECT"],
   "people.manage": ["ADMIN"],
   "settings.manage": ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;

@@ -8,6 +8,8 @@ coverage
 playwright-report
 test-results
 src/generated
+# Downloaded embedding models (the image downloads its own at build time)
+.cache
 
 .env*
 !.env.example

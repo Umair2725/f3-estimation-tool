@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 import { PrismaClient, type ProjectPart, type Role } from "../src/generated/prisma/client";
+import { embedderFor } from "../src/server/matching/embedder";
+import { reindexAll } from "../src/server/matching/knowledge";
 import { backfillApproved, storeApprovedVersion } from "../src/server/review/snapshot-source";
 
 try {
@@ -67,9 +69,20 @@ async function main() {
     }
     console.log(`seeded ${person.email} (${person.role ?? "no role"})`);
   }
+  // Users only: tests that change people reset them without touching requests other tests use.
+  if (process.env.SEED_USERS_ONLY === "1") return;
   await seedRequests();
   const backfilled = await backfillApproved(db);
   if (backfilled) console.log(`approved versions backfilled: ${backfilled}`);
+  // The matching index (specs/feature-matching): stub vectors in tests, the local model otherwise.
+  const index = await reindexAll(
+    db,
+    embedderFor({
+      EMBEDDINGS_PROVIDER: process.env.EMBEDDINGS_PROVIDER === "stub" ? "stub" : "local",
+      EMBEDDINGS_CACHE_DIR: process.env.EMBEDDINGS_CACHE_DIR,
+    }),
+  );
+  console.log(`knowledge index: ${index.entries} entries`);
 }
 
 // Sample estimation requests with fictional clients (the same names as the design prototype;

@@ -48,6 +48,10 @@ model User {
   approvals       ApprovedVersion[]
   notifications   Notification[]      @relation("notificationUser")
   notified        Notification[]      @relation("notificationActor")
+  referencesAsked ReferenceRequest[]  @relation("referenceAsker")
+  referencesToDo  ReferenceRequest[]  @relation("referenceArchitect")
+  references      FeatureReference[]
+  suggestionCalls TaskSuggestion[]
   exports         ExportRecord[]
   actuals         ActualsVersion[]
   uploads         ActualsUpload[]
@@ -206,6 +210,9 @@ model EstimationRequest {
   comments       ReviewComment[]
   approved       ApprovedVersion[]
   notifications  Notification[]
+  knowledge      KnowledgeItem[]
+  referenceAsks  ReferenceRequest[]
+  references     FeatureReference[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([reviewerId, status])
@@ -276,13 +283,15 @@ model Feature {
 
 // One per feature × part: a Task on that part's development sheet. Name and order come from the feature.
 model EstimateTask {
-  id            String          @id @default(uuid())
-  featureId     String          @map("feature_id")
-  feature       Feature         @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  requestPartId String          @map("request_part_id")
-  requestPart   RequestPart     @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  featureId     String             @map("feature_id")
+  feature       Feature            @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  requestPartId String             @map("request_part_id")
+  requestPart   RequestPart        @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
   subTasks      SubTask[]
   comments      ReviewComment[]
+  suggestion    TaskSuggestion?
+  referenceAsks ReferenceRequest[]
 
   @@unique([featureId, requestPartId])
   @@index([requestPartId])
@@ -566,6 +575,9 @@ enum NotificationKind {
   SUBMITTED
   CHANGES_REQUESTED
   APPROVED
+  REFERENCE_REQUESTED
+  REFERENCE_ADDED
+  REFERENCE_DECLINED
 }
 
 model Notification {
@@ -582,4 +594,132 @@ model Notification {
 
   @@index([userId, readAt])
   @@map("notification")
+}
+
+// ---------- Matching (specs/feature-matching) ----------
+
+enum KnowledgeKind {
+  APPROVED_PRE_AI
+  APPROVED_AI_ERA
+  ARCHITECT_REFERENCE
+}
+
+// One Task of a latest approved version, or one Architect reference, with its embedding.
+model KnowledgeItem {
+  id           String                     @id @default(uuid())
+  kind         KnowledgeKind
+  requestId    String?                    @map("request_id")
+  request      EstimationRequest?         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  version      Int?
+  referenceId  String?                    @map("reference_id")
+  reference    FeatureReference?          @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  part         ProjectPart
+  partLabel    String                     @map("part_label")
+  title        String
+  subTasks     Json                       @map("sub_tasks") // [{ title, minTenths, maxTenths, actualTenths? }]
+  minTenths    Int                        @map("min_tenths")
+  maxTenths    Int                        @map("max_tenths")
+  actualTenths Int?                       @map("actual_tenths")
+  projectName  String?                    @map("project_name")
+  clientName   String?                    @map("client_name")
+  authorName   String?                    @map("author_name")
+  sourceDate   DateTime                   @map("source_date")
+  text         String
+  // Which embedder made the vector ("local" or "stub"); searches only compare like with like.
+  model        String                     @default("local")
+  embedding    Unsupported("vector(384)")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+
+  @@index([model, part])
+  @@index([requestId])
+  @@map("knowledge_item")
+}
+
+// Reference hours an Architect added for a feature that had no reliable match.
+model FeatureReference {
+  id          String             @id @default(uuid())
+  title       String
+  description String             @default("")
+  part        ProjectPart
+  stack       String[]
+  subTasks    Json               @map("sub_tasks") // [{ title, minTenths, maxTenths }]
+  authorId    String             @map("author_id")
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  requestId   String?            @map("request_id")
+  request     EstimationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  knowledge   KnowledgeItem[]
+  answers     ReferenceRequest[]
+
+  @@map("feature_reference")
+}
+
+enum ReferenceRequestStatus {
+  OPEN
+  ANSWERED
+  DECLINED
+}
+
+model ReferenceRequest {
+  id                 String                 @id @default(uuid())
+  requestId          String                 @map("request_id")
+  request            EstimationRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  taskId             String?                @map("task_id")
+  task               EstimateTask?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  featureName        String                 @map("feature_name")
+  featureDescription String                 @default("") @map("feature_description")
+  part               ProjectPart
+  partLabel          String                 @map("part_label")
+  stack              String[]
+  note               String                 @default("")
+  askedById          String                 @map("asked_by_id")
+  askedBy            User                   @relation("referenceAsker", fields: [askedById], references: [id], onDelete: Restrict)
+  architectId        String                 @map("architect_id")
+  architect          User                   @relation("referenceArchitect", fields: [architectId], references: [id], onDelete: Restrict)
+  status             ReferenceRequestStatus @default(OPEN)
+  declineReason      String?                @map("decline_reason")
+  referenceId        String?                @map("reference_id")
+  reference          FeatureReference?      @relation(fields: [referenceId], references: [id], onDelete: SetNull)
+  createdAt          DateTime               @default(now()) @map("created_at")
+  answeredAt         DateTime?              @map("answered_at")
+
+  @@index([architectId, status])
+  @@index([requestId])
+  @@map("reference_request")
+}
+
+enum SuggestionMethod {
+  ARCHITECT_REFERENCE
+  AI_ERA_ACTUALS
+  AI_ERA_ESTIMATE
+  PRE_AI_MATCH
+  AI_GUESS
+  NO_MATCH
+}
+
+enum SuggestionDecision {
+  PENDING
+  ACCEPTED
+  ADJUSTED
+  REJECTED
+}
+
+// The current suggestion for one Task, replaced each time matches are found.
+model TaskSuggestion {
+  id                 String             @id @default(uuid())
+  taskId             String             @unique @map("task_id")
+  task               EstimateTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  method             SuggestionMethod
+  matches            Json // the matches shown, with similarity
+  suggested          Json? // [{ title, minTenths, maxTenths, comment }]
+  suggestedMinTenths Int?               @map("suggested_min_tenths")
+  suggestedMaxTenths Int?               @map("suggested_max_tenths")
+  decision           SuggestionDecision @default(PENDING)
+  reason             String?
+  decidedById        String?            @map("decided_by_id")
+  decidedBy          User?              @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt          DateTime?          @map("decided_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  @@map("task_suggestion")
 }

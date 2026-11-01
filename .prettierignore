@@ -17,3 +17,6 @@ openspec
 .claude
 AGENTS.md
 README.md
+
+# Downloaded embedding models
+.cache

@@ -38,6 +38,15 @@ export const envSchema = z
       (value) => (value === "" || value === undefined ? "0" : value),
       z.enum(["0", "1"]),
     ),
+    // Matching (specs/feature-matching): embeddings run locally; "stub" is for tests.
+    EMBEDDINGS_PROVIDER: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["local", "stub"]).default("local"),
+    ),
+    EMBEDDINGS_CACHE_DIR: optionalText,
+    // Optional: without a key, AI guesses are off. Never logged or shown.
+    ANTHROPIC_API_KEY: optionalText,
+    ANTHROPIC_MODEL: optionalText,
   })
   .superRefine((env, ctx) => {
     const production = env.NODE_ENV === "production";

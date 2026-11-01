@@ -4,7 +4,12 @@ import { can, ROLE_LABELS, type Role } from "@/server/auth/permissions";
 import { getDb } from "@/server/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { RequestStatus } from "@/lib/estimation/options";
-import { attentionGroups, minOverMaxMessage, type AttentionGroup } from "@/lib/review/attention";
+import {
+  attentionGroups,
+  matchingGroups,
+  minOverMaxMessage,
+  type AttentionGroup,
+} from "@/lib/review/attention";
 import { readSnapshot, type ApprovedSnapshot } from "@/lib/review/snapshot";
 import {
   canAct,
@@ -19,15 +24,16 @@ import {
 import type { Totals } from "@/lib/estimation/totals";
 import { estimateChecklist, estimateTotals, getEstimate, type EstimateView } from "./estimates";
 import { getRequest } from "./estimation-requests";
+import { reindexRequestSoftly } from "./matching/hooks";
+import { matchingAttention } from "./matching/matching";
 import { storeApprovedVersion } from "./review/snapshot-source";
+import { notify } from "./notify";
 import { assertAccess, ServiceError } from "./service-error";
 
 // Review and approval (specs/estimate-review). Every function checks the caller itself; status
 // changes are conditional updates, so two people acting at once can't both succeed.
 
 type Tx = Prisma.TransactionClient;
-type NotificationKind = "SUBMITTED" | "CHANGES_REQUESTED" | "APPROVED";
-
 export const CHANGES_COMMENT_REQUIRED = "Add a comment saying what to change";
 export const CHOOSE_APPROVER = "Choose a Tech Lead or Architect";
 const COMMENT_REFUSED = "You can't comment on this request";
@@ -90,15 +96,6 @@ async function record(
       comment: input.comment ?? null,
     },
   });
-}
-
-/** The one place a review notification is created (email can be added here later). */
-async function notify(
-  tx: Tx,
-  input: { userId: string; requestId: string; kind: NotificationKind; actorId: string },
-) {
-  if (input.userId === input.actorId) return;
-  await tx.notification.create({ data: input });
 }
 
 // ---------- actions ----------
@@ -217,6 +214,8 @@ export async function approve(actor: CurrentUser | null, id: string) {
       actorId: actor.id,
     });
   });
+  // The approved version becomes a knowledge-base source (specs/feature-matching).
+  await reindexRequestSoftly(id);
 }
 
 export async function reopen(actor: CurrentUser | null, id: string) {
@@ -438,7 +437,10 @@ export async function getReview(actor: CurrentUser | null, id: string): Promise<
     panel,
     ownerName: estimate.request.ownerName,
     totals: estimateTotals(estimate),
-    attention: attentionGroups(estimateChecklist(estimate)),
+    attention: [
+      ...matchingGroups(await matchingAttention(id)),
+      ...attentionGroups(estimateChecklist(estimate)),
+    ],
     comments,
   };
 }
@@ -492,11 +494,17 @@ export async function listReviews(actor: CurrentUser | null, now = new Date()) {
 }
 
 /** How many requests wait for this person's review (the sidebar count). */
+/** What waits for this person on the Reviews page: reviews, plus reference requests for Architects. */
 export async function reviewCount(actor: CurrentUser | null): Promise<number> {
   if (!actor || !can(actor.role, "estimate.approve")) return 0;
-  return getDb().estimationRequest.count({
-    where: { reviewerId: actor.id, status: "IN_REVIEW" },
-  });
+  const db = getDb();
+  const [reviews, references] = await Promise.all([
+    db.estimationRequest.count({ where: { reviewerId: actor.id, status: "IN_REVIEW" } }),
+    can(actor.role, "reference.provide")
+      ? db.referenceRequest.count({ where: { architectId: actor.id, status: "OPEN" } })
+      : 0,
+  ]);
+  return reviews + references;
 }
 
 export async function unreadNotifications(actor: CurrentUser | null) {

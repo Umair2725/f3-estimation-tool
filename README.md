@@ -266,6 +266,31 @@ Unreviewed estimates never reach a client or the knowledge base.
   - Home shows **Awaiting my review** and **Updates**.
 - Exports of anything not approved say **"DRAFT – not approved"** on the Summary sheet and its printed header.
 
+## Matching
+
+The tool suggests hours for each Task (one feature on one part) from Folio3's approved past work, and every number says where it came from.
+
+- **The knowledge index** holds each Task of every request's latest approved version, plus every **Architect reference**.
+  - Each entry is embedded by a small open-source model (`bge-small-en-v1.5`) running on the server, so estimate text never leaves it. Entries are stored in PostgreSQL with pgvector.
+  - The index updates when a request or an import is approved and when actual hours are saved. `npm run reindex-knowledge` rebuilds it.
+- **Find matches**, on the estimate page for one Task or for all of them, shows up to 5 similar past Tasks on the same part. Each has its similarity, source (with a link), date, stack, Min–Max and actual hours.
+- **The suggestion** uses the first of these that's at least 77% similar:
+  1. an Architect reference
+  2. AI-era actual hours
+  3. an approved AI-era estimate
+  4. a pre-AI match, shown unchanged and labelled "the AI reduction isn't applied yet"
+- **Accept / Adjust (with a reason) / Reject:** accepting replaces the Task's Sub tasks, each commented with its source (for example "From Patient portal MVP v1, Backend (Node.js)"). The note carries through to the Excel export. Save your own edits first.
+- **No reliable match:**
+  - **Ask an Architect** for reference hours. The Architect sees the request on the Reviews page and adds Sub tasks with Min/Max, or declines with a reason.
+  - The reference is used at once for this Task and for every similar feature in later requests.
+  - **AI guess** (optional): with `ANTHROPIC_API_KEY` in `.env`, Claude proposes Sub tasks labelled "AI-generated, no historical reference". Only the request's own feature, part and stack are sent; never client names or other estimates.
+- The review page flags AI guesses, Tasks with no match and no hours, and Tasks waiting for a reference.
+- **Settings:**
+  - `EMBEDDINGS_PROVIDER` is `local` (default) or `stub` (tests only).
+  - `EMBEDDINGS_CACHE_DIR` is where the model is cached.
+  - `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` (default `claude-opus-5-5`) are for AI guesses.
+- **First run:** `npm run embeddings:download`, then `npm run reindex-knowledge`. The seed also rebuilds the index, and the Docker image has the model built in.
+
 ## Scripts
 
 | Script | What it does |
@@ -283,6 +308,8 @@ Unreviewed estimates never reach a client or the knowledge base.
 | `db:generate` | Regenerate the Prisma client (also runs after `npm ci`) |
 | `db:studio` | Browse the database |
 | `parse-estimate` | Read a local estimate `.xlsx` and print what the parser finds (see below). Nothing is uploaded or stored |
+| `embeddings:download` | Download the local embedding model for matching (once; the Docker build does it) |
+| `reindex-knowledge` | Rebuild the matching index from approved estimates and Architect references. Safe to run repeatedly; the seed runs it too |
 | `backfill-approved` | Give approved requests from before the review workflow (imports) their approved version 1. Safe to run repeatedly; the seed runs it too |
 
 First time running end-to-end tests: `npx.cmd playwright install chromium`.

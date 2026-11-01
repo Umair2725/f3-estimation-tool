@@ -4,6 +4,7 @@ import { ui } from "@/components/ui";
 import { lastActiveLabel } from "@/lib/relative-time";
 import { can } from "@/server/auth/permissions";
 import { requireRole } from "@/server/auth/session";
+import { listReferenceRequests } from "@/server/matching/matching";
 import { listReviews } from "@/server/review";
 
 export const metadata: Metadata = { title: "Reviews · F3 Estimation Tool" };
@@ -23,6 +24,7 @@ export default async function ReviewsPage() {
     );
   }
   const { waiting, recent } = await listReviews(user);
+  const references = can(user.role, "reference.provide") ? await listReferenceRequests(user) : null;
   const now = new Date();
 
   return (
@@ -71,6 +73,43 @@ export default async function ReviewsPage() {
           </ul>
         )}
       </section>
+
+      {references && (
+        <section aria-labelledby="references-title" className={ui.card}>
+          <div className={ui.cardHead}>
+            <h2 id="references-title" className="text-lg font-bold">
+              Reference hours requested
+            </h2>
+            <span className="text-sm text-muted">{references.open.length}</span>
+          </div>
+          {references.open.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted">Nobody is waiting for reference hours.</p>
+          ) : (
+            <ul className="divide-y divide-border" data-testid="reference-requests">
+              {references.open.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold break-words">
+                      {r.featureName} · {r.partLabel}
+                    </div>
+                    <div className="text-sm text-muted">
+                      {r.projectName} · asked by {r.askedByName}{" "}
+                      {lastActiveLabel(r.createdAt, now).toLowerCase()}
+                      {r.note && ` · “${r.note}”`}
+                    </div>
+                  </div>
+                  <Link href={`/references/${r.id}`} className={ui.smallButton}>
+                    Add reference hours
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="recent-title" className={ui.card}>
         <div className={ui.cardHead}>
