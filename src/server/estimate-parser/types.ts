@@ -31,6 +31,8 @@ export type ParsedSubTask = {
   max: number;
   comment: string;
   row: number;
+  /** From an "Actual" column, when the sheet has one (actual-hours files). */
+  actual?: number;
 };
 
 export type ParsedTask = {

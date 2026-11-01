@@ -131,7 +131,7 @@ With `AUTH_DEV_LOGIN=1` (the `.env.example` default) the sign-in page also shows
 | `dev.admin@folio3.com` | Admin |
 | `dev.newcomer@folio3.com` | none (shows the waiting page) |
 
-Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), two of them with sample hours, reset to the same state on every run.
+Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), two of them with sample hours ("Field service app" is won, with actual hours), reset to the same state on every run.
 
 ## Estimation requests
 
@@ -193,6 +193,34 @@ Warnings don't block the internal export.
 **Settings → Estimate defaults** (Admins only):
 - what new requests start from: QA 25%, PM 30%, bug fixing 10%, default rate $30, approved rates $25–$50
 - changes apply to requests created afterwards
+
+## Outcome and actual hours
+
+**Outcome.** On the request page, the owner, a Tech Lead, an Architect or an Admin records what happened:
+- **Mark as won** (In delivery), **Mark as lost** (with an optional reason), or later **Mark as delivered**.
+- Delivered locks the actual hours. Only an Admin can still change them, or reopen the project.
+- Home shows the outcome under the status.
+
+**Actual hours** (request page → **Actual hours**). Tech Leads, Architects and Admins record the real hours; everyone else sees them read-only.
+
+- **In the tool:**
+  - type the actual hours next to each Sub task; leave it empty if it wasn't built
+  - add rows for unplanned work
+  - **Save as a new version**
+- **By upload:**
+  1. Export the estimate.
+  2. In Excel, replace the hours with the real hours: make Min and Max the same, or add an "Actual" column. Add rows for unplanned work and delete rows that weren't built.
+  3. Upload the file (.xlsx, up to 10 MB).
+  4. Check the preview:
+     - every row is **Matched**, **Unplanned** or **Dropped**
+     - renamed rows ("User login" → "User Login + OTP") are proposed as matches for you to confirm or reject
+     - if Min and Max differ, Min is used and the row is flagged
+     - you can fix hours and choose a part for unknown sheets
+  5. Nothing is saved until **Save as a new version**. The original file is kept with its version.
+- **Accuracy report:** estimated Min–Max vs actual hours by part and Task, with the variance against Min. It shows unplanned and dropped work separately, and is marked **Final** once the project is delivered.
+- Home and the request page show "· actual N" next to the estimated total.
+
+Until review and approval exist, any request with estimated hours can be marked as won.
 
 ## Scripts
 

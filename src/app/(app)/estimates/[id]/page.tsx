@@ -8,7 +8,11 @@ import { lastActiveLabel } from "@/lib/relative-time";
 import { requireRole } from "@/server/auth/session";
 import { getRequest } from "@/server/estimation-requests";
 import { ServiceError } from "@/server/service-error";
+import { formatHours } from "@/lib/estimation/totals";
+import { latestActualTotals } from "@/server/actuals";
+import { OUTCOME_LABELS, outcomeChoices } from "@/server/outcome";
 import { DeleteDraft } from "./delete-draft";
+import { OutcomeControls } from "./outcome-controls";
 
 export const metadata: Metadata = { title: "Estimation request · F3 Estimation Tool" };
 
@@ -21,6 +25,7 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
     if (err instanceof ServiceError && err.status === 404) notFound();
     throw err;
   });
+  const actualTotal = (await latestActualTotals([request.id])).get(request.id);
   const c = request.considerations;
   const nfr = NFR_AREAS.filter((a) => c.nfr[a.key]?.enabled).map((a) => ({
     label: a.label,
@@ -131,6 +136,12 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
           <div className="text-sm text-muted">Total hours (min–max)</div>
           <div className="text-2xl font-bold tabular-nums" data-testid="request-total">
             {request.hours}
+            {actualTotal !== undefined && (
+              <span className="text-base font-semibold text-foreground-2">
+                {" "}
+                · actual {formatHours(actualTotal)}
+              </span>
+            )}
           </div>
         </div>
         <div className="text-sm text-muted">
@@ -138,6 +149,38 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
             ? `Last exported by ${request.lastExport.userName} · ${lastActiveLabel(request.lastExport.createdAt, new Date()).toLowerCase()}`
             : "Not exported yet"}
         </div>
+      </section>
+
+      <section
+        aria-labelledby="outcome-title"
+        className={`${ui.card} flex flex-col gap-3 px-5 py-4`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="outcome-title" className="text-sm text-muted">
+              Outcome
+            </h2>
+            <div className="text-lg font-bold" data-testid="outcome">
+              {OUTCOME_LABELS[request.outcome]}
+              {request.outcome === "LOST" && request.outcomeReason && (
+                <span className="text-base font-normal text-foreground-2">
+                  {" "}
+                  · {request.outcomeReason}
+                </span>
+              )}
+            </div>
+          </div>
+          {request.outcome !== "NONE" && request.outcome !== "LOST" && (
+            <Link href={`/estimates/${request.id}/actuals`} className={ui.secondaryButton}>
+              Actual hours
+            </Link>
+          )}
+        </div>
+        <OutcomeControls
+          id={request.id}
+          choices={outcomeChoices(user, { ownerId: request.ownerId, outcome: request.outcome })}
+          hasHours={request.hours !== "–"}
+        />
       </section>
 
       {notice === "view-only" && (

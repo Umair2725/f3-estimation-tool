@@ -278,6 +278,9 @@ export type RequestDetail = {
   canDelete: boolean;
   /** Grand total "195–276", or "–" before any hours. */
   hours: string;
+  outcome: "NONE" | "IN_DELIVERY" | "LOST" | "DELIVERED";
+  outcomeReason: string | null;
+  ownerId: string;
   lastExport: { userName: string; createdAt: Date } | null;
   missing: MissingItem[];
 };
@@ -343,6 +346,9 @@ export async function getRequest(actor: CurrentUser | null, id: string): Promise
     canEdit: canEditRequest(actor, request),
     canDelete: canDeleteRequest(actor, request),
     hours: requestHours(request),
+    outcome: request.outcome,
+    outcomeReason: request.outcomeReason,
+    ownerId: request.ownerId,
     lastExport: request.exports[0]
       ? { userName: request.exports[0].user.name, createdAt: request.exports[0].createdAt }
       : null,
@@ -385,6 +391,7 @@ export type RequestListRow = {
   clientName: string | null;
   status: RequestStatus;
   ownerName: string;
+  outcome: "NONE" | "IN_DELIVERY" | "LOST" | "DELIVERED";
   parts: Part[];
   /** Grand total "195–276", or "–" before any Sub task hours (specs/estimate-hours). */
   hours: string;
@@ -449,6 +456,7 @@ export async function listRequests(actor: CurrentUser | null, filters: RequestFi
         .map((p) => p.part)
         .sort((a, b) => PART_VALUES.indexOf(a) - PART_VALUES.indexOf(b)),
       hours: requestHours(r),
+      outcome: r.outcome,
       updatedAt: r.updatedAt,
     })),
   };
