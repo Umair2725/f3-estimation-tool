@@ -280,6 +280,12 @@ export type RequestDetail = {
   hours: string;
   outcome: "NONE" | "IN_DELIVERY" | "LOST" | "DELIVERED";
   outcomeReason: string | null;
+  origin: "NEW" | "IMPORTED";
+  /** The original files of an imported project. */
+  importedFiles: {
+    estimate: { id: string; fileName: string } | null;
+    actuals: { id: string; fileName: string } | null;
+  } | null;
   ownerId: string;
   lastExport: { userName: string; createdAt: Date } | null;
   missing: MissingItem[];
@@ -304,6 +310,14 @@ export async function getRequest(actor: CurrentUser | null, id: string): Promise
         include: { user: { select: { name: true } } },
       },
       features: { orderBy: { position: "asc" } },
+      importedFrom: {
+        where: { status: "APPROVED" },
+        take: 1,
+        include: {
+          estimateFile: { select: { id: true, fileName: true } },
+          actualsFile: { select: { id: true, fileName: true } },
+        },
+      },
     },
   });
   if (!request) throw new ServiceError("Request not found", 404);
@@ -348,6 +362,13 @@ export async function getRequest(actor: CurrentUser | null, id: string): Promise
     hours: requestHours(request),
     outcome: request.outcome,
     outcomeReason: request.outcomeReason,
+    origin: request.origin,
+    importedFiles: request.importedFrom[0]
+      ? {
+          estimate: request.importedFrom[0].estimateFile,
+          actuals: request.importedFrom[0].actualsFile,
+        }
+      : null,
     ownerId: request.ownerId,
     lastExport: request.exports[0]
       ? { userName: request.exports[0].user.name, createdAt: request.exports[0].createdAt }
@@ -392,6 +413,7 @@ export type RequestListRow = {
   status: RequestStatus;
   ownerName: string;
   outcome: "NONE" | "IN_DELIVERY" | "LOST" | "DELIVERED";
+  origin: "NEW" | "IMPORTED";
   parts: Part[];
   /** Grand total "195–276", or "–" before any Sub task hours (specs/estimate-hours). */
   hours: string;
@@ -457,6 +479,7 @@ export async function listRequests(actor: CurrentUser | null, filters: RequestFi
         .sort((a, b) => PART_VALUES.indexOf(a) - PART_VALUES.indexOf(b)),
       hours: requestHours(r),
       outcome: r.outcome,
+      origin: r.origin,
       updatedAt: r.updatedAt,
     })),
   };

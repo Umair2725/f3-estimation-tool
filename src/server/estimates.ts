@@ -46,7 +46,7 @@ export type EstimateView = {
       featureId: string;
       featureName: string;
       featureDescription: string;
-      subTasks: { title: string; min: number; max: number; comment: string }[];
+      subTasks: { title: string; min: number; max: number; comment: string; source?: string }[];
     }[];
   }[];
   features: { id: string; name: string; description: string; parts: Part[] }[];
@@ -122,6 +122,7 @@ export async function getEstimate(actor: CurrentUser | null, id: string): Promis
               min: hours(s.minTenths),
               max: hours(s.maxTenths),
               comment: s.comment,
+              ...(s.sourceSheet ? { source: `${s.sourceSheet}, row ${s.sourceRow}` } : {}),
             })),
           };
         }),

@@ -140,6 +140,14 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                           {OUTCOME_LABELS[row.outcome]}
                         </span>
                       )}
+                      {row.origin === "IMPORTED" && (
+                        <span
+                          className="mt-1 block text-xs font-semibold text-info"
+                          data-testid="row-imported"
+                        >
+                          Imported
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">{row.ownerName}</td>
                     <td className="px-3 py-3">

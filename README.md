@@ -222,6 +222,31 @@ Warnings don't block the internal export.
 
 Until review and approval exist, any request with estimated hours can be marked as won.
 
+## Importing past projects
+
+Admins load Folio3's approved past estimates, with actual hours for delivered projects, under **Settings → Import past projects** (also in the sidebar).
+
+- **Upload:**
+  - **One project:** the estimate `.xlsx`, plus the actuals `.xlsx` if it was delivered.
+  - **Many projects:** a `.zip` with **one folder per project**. Name the actuals file `…-actuals.xlsx` (or `_actuals`, or ` actuals`); the other `.xlsx` is the estimate. Files in the zip root are estimate-only projects, and other files are ignored and listed.
+  - Limits: 10 MB per `.xlsx`, 100 MB per zip, 150 projects per batch.
+- **Each project has a preview** (**Check**):
+  - the Summary details, each sheet with its detected part, and every Task and Sub task with its source row
+  - the parser's warnings
+  - for delivered projects, the estimate-vs-actual comparison
+- **Corrections on the preview:** fix the project name or client, choose a part (or Skip) for unknown sheets such as "MVP", rename or exclude rows, and swap the estimate and actuals files. Then **Save changes**.
+- **Duplicates are recognised by file content, not file name:**
+  - the same file again → "Already imported" (Skip or Keep both)
+  - the same project and client with different content → "Possibly a newer version" (Link as new version, Treat as different, or Skip)
+- **Approve and import** creates a read-only historical project, marked **Imported**, with its hours tagged as the pre-AI baseline.
+  - Every Sub task keeps its source sheet and row.
+  - With an actuals file it's **Delivered**, and its actual hours become version 1. Rows matched by similar names are flagged.
+  - The original files can be downloaded from the project.
+- **Reject** or **Skip** creates nothing. A file that can't be read fails only its own project.
+- **The batch page** shows imported, waiting, skipped, rejected and failed projects, with reasons.
+
+Real estimates are client data: keep them in `samples/` or `uploads/`, which git ignores, and never commit them.
+
 ## Scripts
 
 | Script | What it does |

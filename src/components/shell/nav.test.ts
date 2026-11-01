@@ -35,3 +35,15 @@ describe("navFor links (specs/estimation-requests)", () => {
     expect(estimates?.soon).toBeUndefined();
   });
 });
+
+describe("import entry (specs/historical-import)", () => {
+  const item = (role: Parameters<typeof navFor>[0]) =>
+    navFor(role)
+      .flatMap((g) => g.items)
+      .find((i) => i.label === "Import past projects");
+  it("links Admins to the import and hides it from everyone else", () => {
+    expect(item("ADMIN")).toMatchObject({ href: "/settings/import" });
+    expect(item("ESTIMATOR")).toBeUndefined();
+    expect(item("ARCHITECT")).toBeUndefined();
+  });
+});
