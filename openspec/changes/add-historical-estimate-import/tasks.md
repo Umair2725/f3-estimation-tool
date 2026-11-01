@@ -26,7 +26,7 @@
 ## 5. Docs and CI
 
 - [x] 5.1 Update `README.md` (preparing a zip, the actuals naming, the preview, duplicates, what approval creates, limits; never commit real files)
-- [ ] 5.2 Verify CI is green on the pull request
+- [x] 5.2 Verify CI is green on the pull request
 
 ## Workflow follow-up
 
