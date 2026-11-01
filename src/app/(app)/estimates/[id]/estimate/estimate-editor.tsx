@@ -14,9 +14,11 @@ import {
   type MinMax,
 } from "@/lib/estimation/totals";
 import type { EstimateView } from "@/server/estimates";
+import type { MatchingView } from "@/server/matching/matching";
 import type { ReviewComment } from "@/server/review";
 import { CommentBox } from "../review/comment-box";
 import { saveEstimateAction } from "./actions";
+import { TaskMatches } from "./task-matches";
 
 // The estimate page (specs/estimate-hours, approved design screen 4 without AI). Everything is
 // edited locally with live totals and saved with one Save; Export needs a saved estimate.
@@ -109,7 +111,15 @@ function toInput(state: State) {
 /** Review comments shown on the estimate (specs/estimate-review "Comments"). */
 export type EditorReview = { requestId: string; comments: ReviewComment[]; canComment: boolean };
 
-export function EstimateEditor({ view, review }: { view: EstimateView; review: EditorReview }) {
+export function EstimateEditor({
+  view,
+  review,
+  matching,
+}: {
+  view: EstimateView;
+  review: EditorReview;
+  matching: MatchingView;
+}) {
   const router = useRouter();
   const editable = view.request.canEdit;
   const [state, setState] = useState<State>(() => fromView(view));
@@ -262,6 +272,8 @@ export function EstimateEditor({ view, review }: { view: EstimateView; review: E
               total={partTotals(current.part)?.tasks[current.tasks.indexOf(task)]}
               editable={editable}
               review={review}
+              matching={matching}
+              dirty={dirty}
               onChange={(patch) => updateTask(current.part, task.taskId, patch)}
             />
           ))}
@@ -517,6 +529,8 @@ function TaskCard(props: {
   total: MinMax | undefined;
   editable: boolean;
   review: EditorReview;
+  matching: MatchingView;
+  dirty: boolean;
   onChange: (patch: (t: TaskState) => TaskState) => void;
 }) {
   const { task, editable } = props;
@@ -663,6 +677,12 @@ function TaskCard(props: {
           </button>
         </div>
       )}
+      <TaskMatches
+        requestId={props.review.requestId}
+        taskId={task.taskId}
+        matching={props.matching}
+        dirty={props.dirty}
+      />
     </section>
   );
 }

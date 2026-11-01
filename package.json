@@ -22,10 +22,14 @@
     "db:seed": "tsx prisma/seed.ts",
     "parse-estimate": "tsx scripts/parse-estimate.ts",
     "backfill-approved": "tsx scripts/backfill-approved.ts",
+    "embeddings:download": "tsx scripts/embeddings-download.ts",
+    "reindex-knowledge": "tsx scripts/reindex-knowledge.ts",
     "test:int": "vitest run --project integration"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@huggingface/transformers": "4.3.1",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "better-auth": "1.7.14",

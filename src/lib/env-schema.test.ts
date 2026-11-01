@@ -29,8 +29,19 @@ describe("validateEnv: database and basics", () => {
         LOG_LEVEL: "info",
         ADMIN_EMAILS: undefined,
         AUTH_DEV_LOGIN: "0",
+        EMBEDDINGS_PROVIDER: "local",
+        EMBEDDINGS_CACHE_DIR: undefined,
+        ANTHROPIC_API_KEY: undefined,
+        ANTHROPIC_MODEL: undefined,
       },
     });
+  });
+
+  it("accepts the stub embeddings provider and refuses unknown ones", () => {
+    expect(validateEnv({ ...base, EMBEDDINGS_PROVIDER: "stub" }).ok).toBe(true);
+    expect(problemsOf({ ...base, EMBEDDINGS_PROVIDER: "openai" })).toEqual([
+      { name: "EMBEDDINGS_PROVIDER", problem: "invalid" },
+    ]);
   });
 
   it("accepts the postgres:// scheme too", () => {

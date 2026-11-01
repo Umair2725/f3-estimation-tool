@@ -5,8 +5,9 @@ import { apiSignIn, authFile, PASSWORD, seed, USERS } from "./helpers";
 // steps change the dev newcomer, so they run in order on freshly seeded data.
 test.describe.configure({ mode: "serial" });
 
-test.beforeAll(() => seed());
-test.afterAll(() => seed());
+// Users only: other specs read the sample requests while this one runs.
+test.beforeAll(() => seed({ usersOnly: true }));
+test.afterAll(() => seed({ usersOnly: true }));
 
 async function newcomerPage(browser: Browser) {
   const page = await (await browser.newContext()).newPage();

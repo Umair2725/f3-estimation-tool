@@ -1,4 +1,5 @@
 import "server-only";
+import { reindexRequestSoftly } from "./matching/hooks";
 import type { CurrentUser } from "@/server/auth/access";
 import { can } from "@/server/auth/permissions";
 import { getDb } from "@/server/db";
@@ -265,7 +266,7 @@ export type ManualInput = {
 /** Saves actual hours typed in the tool as a new version. Estimated Sub tasks left empty are Dropped. */
 export async function saveManualVersion(actor: CurrentUser | null, id: string, input: ManualInput) {
   assertAccess(actor);
-  return getDb().$transaction(async (tx) => {
+  const version = await getDb().$transaction(async (tx) => {
     const request = await loadRequest(tx, id);
     assertCanRecord(actor, request.outcome);
     const estimate = await estimateParts(tx, id);
@@ -314,6 +315,9 @@ export async function saveManualVersion(actor: CurrentUser | null, id: string, i
     }
     return createVersion(tx, actor, id, rows);
   });
+  // Indexed entries carry actual hours (specs/feature-matching).
+  await reindexRequestSoftly(id);
+  return version;
 }
 
 // ---------- uploads ----------
@@ -421,7 +425,7 @@ export async function saveUploadVersion(
 ) {
   assertAccess(actor);
   for (const [key, value] of Object.entries(decisions.hours ?? {})) checkHours(value, key);
-  return getDb().$transaction(async (tx) => {
+  const saved = await getDb().$transaction(async (tx) => {
     const request = await loadRequest(tx, id);
     assertCanRecord(actor, request.outcome);
     const upload = await loadUpload(tx, id, uploadId);
@@ -454,6 +458,8 @@ export async function saveUploadVersion(
     await tx.actualsUpload.delete({ where: { id: uploadId } });
     return version;
   });
+  await reindexRequestSoftly(id);
+  return saved;
 }
 
 export async function discardUpload(actor: CurrentUser | null, id: string, uploadId: string) {

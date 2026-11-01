@@ -15,6 +15,7 @@ import {
 import { readDefaults } from "../estimate-defaults";
 import { parseEstimateFile } from "../estimate-parser";
 import { assertAccess, ServiceError } from "../service-error";
+import { reindexRequestSoftly } from "../matching/hooks";
 import { storeApprovedVersion } from "../review/snapshot-source";
 
 // Historical import (specs/historical-import): Admins upload past estimates (with actuals for
@@ -504,7 +505,7 @@ export async function rejectProject(
 /** Approves a project into a read-only historical request (specs/historical-import). */
 export async function approveProject(actor: CurrentUser | null, projectId: string) {
   assertAdmin(actor);
-  return getDb().$transaction(
+  const result = await getDb().$transaction(
     async (tx) => {
       const project = await loadProject(tx, projectId);
       if (project.status !== "READY")
@@ -694,6 +695,8 @@ export async function approveProject(actor: CurrentUser | null, projectId: strin
     },
     { timeout: 60_000 },
   );
+  if (result.requestId) await reindexRequestSoftly(result.requestId);
+  return result;
 }
 
 // ---------- files ----------

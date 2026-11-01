@@ -97,14 +97,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           <ul className="mt-2 flex flex-col gap-1.5 text-sm" data-testid="updates">
             {updates.map((n) => (
               <li key={n.id}>
-                <Link
-                  href={
-                    n.kind === "SUBMITTED"
-                      ? `/estimates/${n.requestId}/review`
-                      : `/estimates/${n.requestId}`
-                  }
-                  className="font-semibold hover:underline"
-                >
+                <Link href={updateLink(n)} className="font-semibold hover:underline">
                   {updateText(n)}
                 </Link>
                 <span className="text-muted">
@@ -266,11 +259,27 @@ function greeting(now: Date): string {
   return "Good evening";
 }
 
-/** Review notifications on Home (specs/estimate-review "In-app review notifications"). */
+/** Notifications on Home (specs/estimate-review, specs/feature-matching). */
 function updateText(n: { kind: string; projectName: string; actorName: string }): string {
-  if (n.kind === "SUBMITTED") return `${n.actorName} submitted ${n.projectName} for your review`;
-  if (n.kind === "CHANGES_REQUESTED") {
-    return `Changes requested on ${n.projectName} by ${n.actorName}`;
+  switch (n.kind) {
+    case "SUBMITTED":
+      return `${n.actorName} submitted ${n.projectName} for your review`;
+    case "CHANGES_REQUESTED":
+      return `Changes requested on ${n.projectName} by ${n.actorName}`;
+    case "REFERENCE_REQUESTED":
+      return `${n.actorName} asked you for reference hours on ${n.projectName}`;
+    case "REFERENCE_ADDED":
+      return `${n.actorName} added reference hours for ${n.projectName}`;
+    case "REFERENCE_DECLINED":
+      return `${n.actorName} declined a request for reference hours on ${n.projectName}`;
+    default:
+      return `${n.projectName} approved by ${n.actorName}`;
   }
-  return `${n.projectName} approved by ${n.actorName}`;
+}
+
+function updateLink(n: { kind: string; requestId: string }): string {
+  if (n.kind === "SUBMITTED") return `/estimates/${n.requestId}/review`;
+  if (n.kind === "REFERENCE_REQUESTED") return "/reviews";
+  if (n.kind.startsWith("REFERENCE_")) return `/estimates/${n.requestId}/estimate`;
+  return `/estimates/${n.requestId}`;
 }

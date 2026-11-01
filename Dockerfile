@@ -19,6 +19,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/src/generated ./src/generated
 COPY . .
 RUN npm run build
+# The local embedding model for matching (specs/feature-matching), baked in so the running
+# container never downloads it.
+RUN EMBEDDINGS_CACHE_DIR=/app/.cache/models npm run embeddings:download
 
 # 3. Prisma CLI only (same version as the project), for running migrations at startup.
 #    Kept apart from the app's small standalone node_modules.
@@ -43,11 +46,13 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    EMBEDDINGS_CACHE_DIR=/app/.cache/models
 
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/.cache/models ./.cache/models
 # Folio3's Excel template, read at runtime by the export (specs/excel-export).
 COPY --chown=node:node docs/templates/Empty_Estimation_Sheet.xlsx ./docs/templates/Empty_Estimation_Sheet.xlsx
 # Startup settings check (runs with Node's built-in TypeScript support).

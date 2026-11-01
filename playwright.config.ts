@@ -32,6 +32,7 @@ export default defineConfig({
       AUTH_URL: BASE_URL,
       AUTH_DEV_LOGIN: "1",
       ENABLE_TEST_ROUTES: "1",
+      EMBEDDINGS_PROVIDER: "stub",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

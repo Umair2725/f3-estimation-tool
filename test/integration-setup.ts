@@ -13,6 +13,9 @@ Object.assign(process.env, {
   AUTH_SECRET: process.env.AUTH_SECRET || "integration-test-secret-0123456789abcdef",
   DEV_USER_PASSWORD: process.env.DEV_USER_PASSWORD || "dev-password-not-for-production",
   ADMIN_EMAILS: "boot.admin@folio3.com",
+  // No model download and no AI calls in tests (specs/feature-matching).
+  EMBEDDINGS_PROVIDER: "stub",
+  ANTHROPIC_API_KEY: "",
 });
 
 if (!process.env.DATABASE_URL) {
