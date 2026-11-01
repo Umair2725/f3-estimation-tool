@@ -53,9 +53,18 @@ export function AppShell(props: { nav: NavGroup[]; person: Person; children: Rea
                   href={item.href}
                   aria-current={isCurrent(pathname, item.match ?? item.href) ? "page" : undefined}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-2.5 py-2 font-medium text-foreground-2 hover:bg-surface-2 hover:text-foreground aria-[current=page]:bg-brand/10 aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
+                  className="flex items-center justify-between rounded-lg px-2.5 py-2 font-medium text-foreground-2 hover:bg-surface-2 hover:text-foreground aria-[current=page]:bg-brand/10 aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
                 >
                   {item.label}
+                  {!!item.count && (
+                    <span
+                      className="rounded-full bg-brand-strong px-2 text-[11px] font-bold text-white"
+                      data-testid="nav-count"
+                    >
+                      {item.count}
+                      <span className="sr-only"> waiting</span>
+                    </span>
+                  )}
                 </Link>
               ) : (
                 <span

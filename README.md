@@ -247,6 +247,25 @@ Admins load Folio3's approved past estimates, with actual hours for delivered pr
 
 Real estimates are client data: keep them in `samples/` or `uploads/`, which git ignores, and never commit them.
 
+## Review and approval
+
+Unreviewed estimates never reach a client or the knowledge base.
+
+- **Submit for review** (the owner, from the request page): choose a Tech Lead or Architect, never yourself.
+  - The request must be complete, and no Sub task can have Min greater than Max.
+  - While it's in review the request is locked for everyone, Admins included. The owner can **Withdraw** it, which is also how to move a review to someone else.
+- **The review page** shows the totals, the parts, **Needs your attention** (the export warnings, such as zero hours or an unconfirmed rate), and every Task and Sub task with its comments.
+  - The Approver, the owner and Admins can comment on the request, a Task or a Sub task.
+  - Comments also show on the estimate page.
+- **Request changes** needs a comment and unlocks the request for the owner.
+- **Approve** stores a frozen copy of the estimate as that version. It's the only thing matching will use.
+- **Edit as new version** turns an approved estimate into a Draft of the next version. The approved copy stays the source until the new version is approved. Imported projects can't be reopened.
+- Every status change is in the request's **History**.
+- **Notifications are in the app for now** (email comes later):
+  - Tech Leads and Architects get a **Reviews** page, with a count in the sidebar.
+  - Home shows **Awaiting my review** and **Updates**.
+- Exports of anything not approved say **"DRAFT – not approved"** on the Summary sheet and its printed header.
+
 ## Scripts
 
 | Script | What it does |
@@ -264,6 +283,7 @@ Real estimates are client data: keep them in `samples/` or `uploads/`, which git
 | `db:generate` | Regenerate the Prisma client (also runs after `npm ci`) |
 | `db:studio` | Browse the database |
 | `parse-estimate` | Read a local estimate `.xlsx` and print what the parser finds (see below). Nothing is uploaded or stored |
+| `backfill-approved` | Give approved requests from before the review workflow (imports) their approved version 1. Safe to run repeatedly; the seed runs it too |
 
 First time running end-to-end tests: `npx.cmd playwright install chromium`.
 

@@ -14,6 +14,8 @@ import {
   type MinMax,
 } from "@/lib/estimation/totals";
 import type { EstimateView } from "@/server/estimates";
+import type { ReviewComment } from "@/server/review";
+import { CommentBox } from "../review/comment-box";
 import { saveEstimateAction } from "./actions";
 
 // The estimate page (specs/estimate-hours, approved design screen 4 without AI). Everything is
@@ -21,6 +23,8 @@ import { saveEstimateAction } from "./actions";
 
 type SubTaskState = {
   key: string;
+  /** Saved Sub tasks keep their id, so review comments stay attached. */
+  id?: string;
   title: string;
   min: string;
   max: string;
@@ -59,6 +63,7 @@ function fromView(view: EstimateView): State {
         ...t,
         rows: t.subTasks.map((s) => ({
           key: newKey(),
+          id: s.id,
           title: s.title,
           source: s.source,
           min: String(s.min),
@@ -82,6 +87,7 @@ function toInput(state: State) {
       p.tasks.map((t) => ({
         taskId: t.taskId,
         subTasks: t.rows.map((r) => ({
+          ...(r.id ? { id: r.id } : {}),
           title: r.title.trim(),
           min: num(r.min),
           max: num(r.max),
@@ -100,7 +106,10 @@ function toInput(state: State) {
   };
 }
 
-export function EstimateEditor({ view }: { view: EstimateView }) {
+/** Review comments shown on the estimate (specs/estimate-review "Comments"). */
+export type EditorReview = { requestId: string; comments: ReviewComment[]; canComment: boolean };
+
+export function EstimateEditor({ view, review }: { view: EstimateView; review: EditorReview }) {
   const router = useRouter();
   const editable = view.request.canEdit;
   const [state, setState] = useState<State>(() => fromView(view));
@@ -252,6 +261,7 @@ export function EstimateEditor({ view }: { view: EstimateView }) {
               task={task}
               total={partTotals(current.part)?.tasks[current.tasks.indexOf(task)]}
               editable={editable}
+              review={review}
               onChange={(patch) => updateTask(current.part, task.taskId, patch)}
             />
           ))}
@@ -506,6 +516,7 @@ function TaskCard(props: {
   task: TaskState;
   total: MinMax | undefined;
   editable: boolean;
+  review: EditorReview;
   onChange: (patch: (t: TaskState) => TaskState) => void;
 }) {
   const { task, editable } = props;
@@ -527,6 +538,7 @@ function TaskCard(props: {
           {task.featureDescription && (
             <p className="text-sm text-muted">{task.featureDescription}</p>
           )}
+          <Comments review={props.review} taskId={task.taskId} title={task.featureName} />
         </div>
         <span className="text-sm font-semibold tabular-nums">
           {props.total ? range(props.total) : "0–0"} h
@@ -566,6 +578,7 @@ function TaskCard(props: {
                         {row.source}
                       </div>
                     )}
+                    {row.id && <Comments review={props.review} subTaskId={row.id} title={label} />}
                   </td>
                   {(["min", "max"] as const).map((field) => (
                     <td key={field} className="px-2 py-2">
@@ -708,5 +721,40 @@ function PartExtras(props: {
         ))}
       </div>
     </section>
+  );
+}
+
+function Comments(props: {
+  review: EditorReview;
+  taskId?: string;
+  subTaskId?: string;
+  title: string;
+}) {
+  const thread = props.review.comments.filter((c) =>
+    props.subTaskId ? c.subTaskId === props.subTaskId : c.taskId === props.taskId,
+  );
+  if (thread.length === 0 && !props.review.canComment) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {thread.length > 0 && (
+        <ul className="flex flex-col gap-1" data-testid="comment-thread">
+          {thread.map((c) => (
+            <li key={c.id} className="rounded-lg bg-surface-2 px-2 py-1 text-xs">
+              <span className="font-semibold">{c.authorName}</span>
+              <span className="text-muted"> · v{c.version}: </span>
+              <span className="whitespace-pre-wrap">{c.body}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {props.review.canComment && (
+        <CommentBox
+          id={props.review.requestId}
+          taskId={props.taskId}
+          subTaskId={props.subTaskId}
+          label={`Comment on ${props.title}`}
+        />
+      )}
+    </div>
   );
 }

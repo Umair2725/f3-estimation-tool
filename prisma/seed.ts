@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 import { PrismaClient, type ProjectPart, type Role } from "../src/generated/prisma/client";
+import { backfillApproved, storeApprovedVersion } from "../src/server/review/snapshot-source";
 
 try {
   process.loadEnvFile();
@@ -67,6 +68,8 @@ async function main() {
     console.log(`seeded ${person.email} (${person.role ?? "no role"})`);
   }
   await seedRequests();
+  const backfilled = await backfillApproved(db);
+  if (backfilled) console.log(`approved versions backfilled: ${backfilled}`);
 }
 
 // Sample estimation requests with fictional clients (the same names as the design prototype;
@@ -90,6 +93,8 @@ type SampleRequest = {
   assumptions?: Partial<Record<ProjectPart, string[]>>;
   // A won project with actual hours per Sub task title (specs/actual-hours).
   actuals?: Record<string, number>;
+  /** Seeded as submitted and approved by this person (never the owner). */
+  approvedBy?: string;
 };
 
 const SAMPLE_REQUESTS: SampleRequest[] = [
@@ -189,6 +194,7 @@ const SAMPLE_REQUESTS: SampleRequest[] = [
     ],
     deployment: { BACKEND: [12, 16], MOBILE: [8, 12] },
     actuals: { "Work order API and sync": 18, "Job list and detail": 11, "Offline sync": 22 },
+    approvedBy: "dev.techlead@folio3.com",
   },
 ];
 
@@ -251,8 +257,41 @@ async function seedRequests() {
     });
     await seedHours(request.id, sample);
     if (sample.actuals) await seedActuals(request.id, owner.id, sample.actuals);
+    if (sample.approvedBy)
+      await seedApproval(request.id, owner.id, sample.approvedBy, sample.daysAgo);
     console.log(`seeded request "${sample.projectName}" (${sample.client})`);
   }
+}
+
+/** Submitted, then approved by another person: version 1 with its history (specs/estimate-review). */
+async function seedApproval(
+  requestId: string,
+  ownerId: string,
+  approverEmail: string,
+  daysAgo: number,
+) {
+  const approver = await db.user.findUniqueOrThrow({ where: { email: approverEmail } });
+  const submitted = new Date(Date.now() - (daysAgo - 1) * 86_400_000);
+  await db.$transaction(async (tx) => {
+    await tx.statusChange.create({
+      data: {
+        requestId,
+        fromStatus: "DRAFT",
+        toStatus: "IN_REVIEW",
+        version: 1,
+        actorId: ownerId,
+        createdAt: submitted,
+      },
+    });
+    await tx.estimationRequest.update({
+      where: { id: requestId },
+      data: { status: "APPROVED", reviewerId: approver.id, submittedAt: submitted },
+    });
+    await storeApprovedVersion(tx, requestId, approver.id, {
+      fromStatus: "IN_REVIEW",
+      at: new Date(submitted.getTime() + 3_600_000),
+    });
+  });
 }
 
 main()

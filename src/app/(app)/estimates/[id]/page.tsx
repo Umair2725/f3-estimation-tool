@@ -13,6 +13,9 @@ import { latestActualTotals } from "@/server/actuals";
 import { OUTCOME_LABELS, outcomeChoices } from "@/server/outcome";
 import { DeleteDraft } from "./delete-draft";
 import { OutcomeControls } from "./outcome-controls";
+import { ReviewCard } from "./review-card";
+import { historyLabel, reviewStatusLine } from "@/lib/review/labels";
+import { getReviewPanel, markRequestRead } from "@/server/review";
 
 export const metadata: Metadata = { title: "Estimation request · F3 Estimation Tool" };
 
@@ -25,7 +28,13 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
     if (err instanceof ServiceError && err.status === 404) notFound();
     throw err;
   });
-  const actualTotal = (await latestActualTotals([request.id])).get(request.id);
+  const [actualTotals, review] = await Promise.all([
+    latestActualTotals([request.id]),
+    getReviewPanel(user, id),
+    markRequestRead(user, id),
+  ]);
+  const actualTotal = actualTotals.get(request.id);
+  const reviewOpenable = review.status !== "DRAFT" && review.origin === "NEW";
   const c = request.considerations;
   const nfr = NFR_AREAS.filter((a) => c.nfr[a.key]?.enabled).map((a) => ({
     label: a.label,
@@ -182,6 +191,47 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
             )}{" "}
             · hours are the pre-AI baseline
           </div>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="review-title"
+        className={`${ui.card} flex flex-col gap-3 px-5 py-4`}
+      >
+        <h2 id="review-title" className="text-sm text-muted">
+          Review
+        </h2>
+        <ReviewCard
+          id={request.id}
+          statusLine={reviewStatusLine(review)}
+          can={{
+            submit: review.can.submit,
+            withdraw: review.can.withdraw,
+            reopen: review.can.reopen,
+            openReview: reviewOpenable,
+          }}
+          approverChoices={review.approverChoices}
+          preselected={review.reviewer?.id ?? null}
+          missing={request.missing.length}
+        />
+        {review.history.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer font-semibold">
+              History ({review.history.length})
+            </summary>
+            <ol className="mt-2 flex flex-col gap-2" data-testid="review-history">
+              {review.history.map((h) => (
+                <li key={h.id}>
+                  <span className="font-semibold">{historyLabel(h)}</span>
+                  <span className="text-muted">
+                    {" "}
+                    · {h.actorName} · {lastActiveLabel(h.createdAt, new Date()).toLowerCase()}
+                  </span>
+                  {h.comment && <p className="text-foreground-2">“{h.comment}”</p>}
+                </li>
+              ))}
+            </ol>
+          </details>
         )}
       </section>
 

@@ -15,6 +15,7 @@ import {
 import { readDefaults } from "../estimate-defaults";
 import { parseEstimateFile } from "../estimate-parser";
 import { assertAccess, ServiceError } from "../service-error";
+import { storeApprovedVersion } from "../review/snapshot-source";
 
 // Historical import (specs/historical-import): Admins upload past estimates (with actuals for
 // delivered projects), check a preview per project, and approve them into read-only historical
@@ -683,6 +684,11 @@ export async function approveProject(actor: CurrentUser | null, projectId: strin
           decidedById: actor.id,
           decidedAt: new Date(),
         },
+      });
+      // Its approved version 1 is the knowledge-base source (specs/estimate-review).
+      await storeApprovedVersion(tx, request.id, actor.id, {
+        fromStatus: null,
+        comment: "Approved (imported)",
       });
       return { status: "APPROVED" as const, requestId: request.id };
     },

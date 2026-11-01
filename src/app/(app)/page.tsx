@@ -9,6 +9,7 @@ import { listFilterOptions, listRequests, myDrafts } from "@/server/estimation-r
 import { formatHours } from "@/lib/estimation/totals";
 import { latestActualTotals } from "@/server/actuals";
 import { OUTCOME_LABELS } from "@/server/outcome";
+import { reviewCount, unreadNotifications } from "@/server/review";
 import { RequestFilters } from "./request-filters";
 
 // Home (specs/home-screen, approved design screen 2).
@@ -18,10 +19,12 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const user = await requireRole("/");
   if (!user) return null; // the layout shows the waiting page
   const filters = parseFilters(await searchParams);
-  const [drafts, list, options] = await Promise.all([
+  const [drafts, list, options, waiting, updates] = await Promise.all([
     myDrafts(user),
     listRequests(user, filters),
     listFilterOptions(user),
+    reviewCount(user),
+    unreadNotifications(user),
   ]);
   const actuals = await latestActualTotals(list.rows.map((r) => r.id));
   const now = new Date();
@@ -49,6 +52,16 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           <div className="text-sm font-semibold text-muted">My drafts</div>
           <div className="mt-1 text-3xl font-bold tabular-nums">{drafts.count}</div>
         </div>
+        {waiting > 0 && (
+          <Link
+            href="/reviews"
+            className={`${ui.card} p-5 hover:bg-surface-2`}
+            data-testid="awaiting-review"
+          >
+            <div className="text-sm font-semibold text-muted">Awaiting my review</div>
+            <div className="mt-1 text-3xl font-bold tabular-nums">{waiting}</div>
+          </Link>
+        )}
         {drafts.latest && (
           <section aria-labelledby="continue-title" className={`${ui.card} p-5 lg:col-span-2`}>
             <h2 id="continue-title" className="text-sm font-semibold text-muted">
@@ -75,6 +88,34 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           </section>
         )}
       </div>
+
+      {updates.length > 0 && (
+        <section aria-labelledby="updates-title" className={`${ui.card} p-5`}>
+          <h2 id="updates-title" className="text-sm font-semibold text-muted">
+            Updates
+          </h2>
+          <ul className="mt-2 flex flex-col gap-1.5 text-sm" data-testid="updates">
+            {updates.map((n) => (
+              <li key={n.id}>
+                <Link
+                  href={
+                    n.kind === "SUBMITTED"
+                      ? `/estimates/${n.requestId}/review`
+                      : `/estimates/${n.requestId}`
+                  }
+                  className="font-semibold hover:underline"
+                >
+                  {updateText(n)}
+                </Link>
+                <span className="text-muted">
+                  {" "}
+                  · {lastActiveLabel(n.createdAt, now).toLowerCase()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section id="requests" aria-labelledby="requests-title" className={ui.card}>
         <div className={`${ui.cardHead} items-start`}>
@@ -223,4 +264,13 @@ function greeting(now: Date): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/** Review notifications on Home (specs/estimate-review "In-app review notifications"). */
+function updateText(n: { kind: string; projectName: string; actorName: string }): string {
+  if (n.kind === "SUBMITTED") return `${n.actorName} submitted ${n.projectName} for your review`;
+  if (n.kind === "CHANGES_REQUESTED") {
+    return `Changes requested on ${n.projectName} by ${n.actorName}`;
+  }
+  return `${n.projectName} approved by ${n.actorName}`;
 }

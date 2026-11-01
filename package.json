@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "db:seed": "tsx prisma/seed.ts",
     "parse-estimate": "tsx scripts/parse-estimate.ts",
+    "backfill-approved": "tsx scripts/backfill-approved.ts",
     "test:int": "vitest run --project integration"
   },
   "dependencies": {

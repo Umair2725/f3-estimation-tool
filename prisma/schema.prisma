@@ -41,7 +41,13 @@ model User {
   sessions        Session[]
   accounts        Account[]
   invitations     RoleInvitation[]
-  requests        EstimationRequest[]
+  requests        EstimationRequest[] @relation("requestOwner")
+  reviewing       EstimationRequest[] @relation("requestReviewer")
+  statusChanges   StatusChange[]
+  reviewComments  ReviewComment[]
+  approvals       ApprovedVersion[]
+  notifications   Notification[]      @relation("notificationUser")
+  notified        Notification[]      @relation("notificationActor")
   exports         ExportRecord[]
   actuals         ActualsVersion[]
   uploads         ActualsUpload[]
@@ -160,7 +166,7 @@ model EstimationRequest {
   projectDate        DateTime       @map("project_date") @db.Date
   status             RequestStatus  @default(DRAFT)
   ownerId            String         @map("owner_id")
-  owner              User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner              User           @relation("requestOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   lastStep           Int            @default(1) @map("last_step")
   applicationTypes   String[]       @map("application_types")
   operatingSystems   String[]       @map("operating_systems")
@@ -182,6 +188,11 @@ model EstimationRequest {
   // Imported past projects are historical, pre-AI baselines (specs/historical-import).
   origin             RequestOrigin  @default(NEW)
   baseline           HoursBaseline  @default(AI_ERA)
+  // Review and approval (specs/estimate-review).
+  version            Int            @default(1)
+  reviewerId         String?        @map("reviewer_id")
+  reviewer           User?          @relation("requestReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  submittedAt        DateTime?      @map("submitted_at")
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
@@ -191,8 +202,13 @@ model EstimationRequest {
   actuals        ActualsVersion[]
   actualsUploads ActualsUpload[]
   importedFrom   ImportedProject[]
+  statusChanges  StatusChange[]
+  comments       ReviewComment[]
+  approved       ApprovedVersion[]
+  notifications  Notification[]
 
   @@index([updatedAt(sort: Desc)])
+  @@index([reviewerId, status])
   @@index([ownerId, status])
   @@index([projectName(ops: raw("gin_trgm_ops"))], type: Gin, map: "estimation_request_project_name_trgm_idx")
   @@map("estimation_request")
@@ -260,12 +276,13 @@ model Feature {
 
 // One per feature × part: a Task on that part's development sheet. Name and order come from the feature.
 model EstimateTask {
-  id            String      @id @default(uuid())
-  featureId     String      @map("feature_id")
-  feature       Feature     @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  requestPartId String      @map("request_part_id")
-  requestPart   RequestPart @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
+  id            String          @id @default(uuid())
+  featureId     String          @map("feature_id")
+  feature       Feature         @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  requestPartId String          @map("request_part_id")
+  requestPart   RequestPart     @relation(fields: [requestPartId], references: [id], onDelete: Cascade)
   subTasks      SubTask[]
+  comments      ReviewComment[]
 
   @@unique([featureId, requestPartId])
   @@index([requestPartId])
@@ -273,20 +290,21 @@ model EstimateTask {
 }
 
 model SubTask {
-  id           String        @id @default(uuid())
-  taskId       String        @map("task_id")
-  task         EstimateTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id           String          @id @default(uuid())
+  taskId       String          @map("task_id")
+  task         EstimateTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   title        String
-  minTenths    Int           @map("min_tenths") // hours × 10, exact
-  maxTenths    Int           @map("max_tenths")
-  comment      String        @default("")
+  minTenths    Int             @map("min_tenths") // hours × 10, exact
+  maxTenths    Int             @map("max_tenths")
+  comment      String          @default("")
   position     Int
   actuals      ActualHours[]
   // Where an imported Sub task came from (specs/historical-import).
-  sourceFileId String?       @map("source_file_id")
-  sourceFile   UploadedFile? @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
-  sourceSheet  String?       @map("source_sheet")
-  sourceRow    Int?          @map("source_row")
+  sourceFileId String?         @map("source_file_id")
+  sourceFile   UploadedFile?   @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  sourceSheet  String?         @map("source_sheet")
+  sourceRow    Int?            @map("source_row")
+  comments     ReviewComment[]
 
   @@index([taskId, position])
   @@map("sub_task")
@@ -489,4 +507,79 @@ model ImportedProject {
 
   @@index([batchId, position])
   @@map("imported_project")
+}
+
+// ---------- Review and approval (specs/estimate-review) ----------
+
+model StatusChange {
+  id         String            @id @default(uuid())
+  requestId  String            @map("request_id")
+  request    EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromStatus RequestStatus?    @map("from_status")
+  toStatus   RequestStatus     @map("to_status")
+  version    Int
+  actorId    String            @map("actor_id")
+  actor      User              @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  comment    String?
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("status_change")
+}
+
+model ReviewComment {
+  id          String            @id @default(uuid())
+  requestId   String            @map("request_id")
+  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId    String            @map("author_id")
+  author      User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  version     Int
+  body        String
+  // A Task or Sub task target; the title is kept so the comment stays readable after removal.
+  taskId      String?           @map("task_id")
+  task        EstimateTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  subTaskId   String?           @map("sub_task_id")
+  subTask     SubTask?          @relation(fields: [subTaskId], references: [id], onDelete: SetNull)
+  targetTitle String?           @map("target_title")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("review_comment")
+}
+
+// The frozen estimate at approval; the latest one is the knowledge-base source.
+model ApprovedVersion {
+  id           String            @id @default(uuid())
+  requestId    String            @map("request_id")
+  request      EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  version      Int
+  snapshot     Json // src/lib/review/snapshot.ts
+  approvedById String            @map("approved_by_id")
+  approvedBy   User              @relation(fields: [approvedById], references: [id], onDelete: Restrict)
+  approvedAt   DateTime          @default(now()) @map("approved_at")
+
+  @@unique([requestId, version])
+  @@map("approved_version")
+}
+
+enum NotificationKind {
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+}
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  user      User              @relation("notificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  requestId String            @map("request_id")
+  request   EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  actorId   String            @map("actor_id")
+  actor     User              @relation("notificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  readAt    DateTime?         @map("read_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@map("notification")
 }

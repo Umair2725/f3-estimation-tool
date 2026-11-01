@@ -164,6 +164,15 @@ describe("historical import (specs/historical-import)", () => {
       pmEnabled: false,
       projectManager: "Sara",
     });
+    // Its approved version 1 is the knowledge-base source (specs/estimate-review).
+    const approved = await db.approvedVersion.findMany({ where: { requestId: requestId! } });
+    expect(approved.map((a) => [a.version, a.approvedById])).toEqual([[1, admin.id]]);
+    expect(
+      await db.statusChange.findMany({
+        where: { requestId: requestId! },
+        select: { toStatus: true, comment: true },
+      }),
+    ).toEqual([{ toStatus: "APPROVED", comment: "Approved (imported)" }]);
     const subTasks = request.parts.flatMap((p) => p.tasks.flatMap((t) => t.subTasks));
     expect(subTasks.map((s) => [s.title, s.minTenths, s.sourceSheet, s.sourceRow])).toEqual([
       ["User login", 80, "BackEnd", 10],
