@@ -110,6 +110,14 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
           </h1>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground-2">
             <StatusBadge status={request.status} />
+            {request.origin === "IMPORTED" && (
+              <span
+                className="rounded-full bg-info-bg px-2.5 py-0.5 text-xs font-semibold text-info"
+                data-testid="imported-label"
+              >
+                Imported
+              </span>
+            )}
             <span>{request.clientName ?? "No client yet"}</span>
             <span>Owner: {request.owner.name}</span>
             <span>Updated {lastActiveLabel(request.updatedAt, new Date()).toLowerCase()}</span>
@@ -149,6 +157,32 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
             ? `Last exported by ${request.lastExport.userName} · ${lastActiveLabel(request.lastExport.createdAt, new Date()).toLowerCase()}`
             : "Not exported yet"}
         </div>
+        {request.importedFiles && (
+          <div className="text-sm text-muted" data-testid="imported-files">
+            Imported from{" "}
+            {request.importedFiles.estimate && (
+              <a
+                className="text-brand-strong underline"
+                href={`/settings/import/files/${request.importedFiles.estimate.id}`}
+              >
+                {request.importedFiles.estimate.fileName}
+              </a>
+            )}
+            {request.importedFiles.actuals && (
+              <>
+                {" "}
+                and{" "}
+                <a
+                  className="text-brand-strong underline"
+                  href={`/settings/import/files/${request.importedFiles.actuals.id}`}
+                >
+                  {request.importedFiles.actuals.fileName}
+                </a>
+              </>
+            )}{" "}
+            · hours are the pre-AI baseline
+          </div>
+        )}
       </section>
 
       <section

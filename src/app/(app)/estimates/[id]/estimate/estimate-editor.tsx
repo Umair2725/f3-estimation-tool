@@ -19,7 +19,15 @@ import { saveEstimateAction } from "./actions";
 // The estimate page (specs/estimate-hours, approved design screen 4 without AI). Everything is
 // edited locally with live totals and saved with one Save; Export needs a saved estimate.
 
-type SubTaskState = { key: string; title: string; min: string; max: string; comment: string };
+type SubTaskState = {
+  key: string;
+  title: string;
+  min: string;
+  max: string;
+  comment: string;
+  /** Where an imported Sub task came from, e.g. "BackEnd, row 19". */
+  source?: string;
+};
 type TaskState = EstimateView["parts"][number]["tasks"][number] & { rows: SubTaskState[] };
 type PartState = Omit<
   EstimateView["parts"][number],
@@ -52,6 +60,7 @@ function fromView(view: EstimateView): State {
         rows: t.subTasks.map((s) => ({
           key: newKey(),
           title: s.title,
+          source: s.source,
           min: String(s.min),
           max: String(s.max),
           comment: s.comment,
@@ -552,6 +561,11 @@ function TaskCard(props: {
                       disabled={!editable}
                       onChange={(e) => setRow(row.key, { title: e.target.value })}
                     />
+                    {row.source && (
+                      <div className="mt-1 text-xs text-muted" data-testid="subtask-source">
+                        {row.source}
+                      </div>
+                    )}
                   </td>
                   {(["min", "max"] as const).map((field) => (
                     <td key={field} className="px-2 py-2">

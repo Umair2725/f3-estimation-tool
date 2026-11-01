@@ -38,13 +38,16 @@ model User {
   createdAt     DateTime   @default(now()) @map("created_at")
   updatedAt     DateTime   @updatedAt @map("updated_at")
 
-  sessions    Session[]
-  accounts    Account[]
-  invitations RoleInvitation[]
-  requests    EstimationRequest[]
-  exports     ExportRecord[]
-  actuals     ActualsVersion[]
-  uploads     ActualsUpload[]
+  sessions        Session[]
+  accounts        Account[]
+  invitations     RoleInvitation[]
+  requests        EstimationRequest[]
+  exports         ExportRecord[]
+  actuals         ActualsVersion[]
+  uploads         ActualsUpload[]
+  files           UploadedFile[]
+  importBatches   ImportBatch[]
+  importDecisions ImportedProject[]
 
   @@map("user")
 }
@@ -176,6 +179,9 @@ model EstimationRequest {
   outcomeReason      String?        @map("outcome_reason")
   outcomeChangedAt   DateTime?      @map("outcome_changed_at")
   outcomeChangedById String?        @map("outcome_changed_by_id")
+  // Imported past projects are historical, pre-AI baselines (specs/historical-import).
+  origin             RequestOrigin  @default(NEW)
+  baseline           HoursBaseline  @default(AI_ERA)
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
@@ -184,6 +190,7 @@ model EstimationRequest {
   exports        ExportRecord[]
   actuals        ActualsVersion[]
   actualsUploads ActualsUpload[]
+  importedFrom   ImportedProject[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([ownerId, status])
@@ -266,15 +273,20 @@ model EstimateTask {
 }
 
 model SubTask {
-  id        String        @id @default(uuid())
-  taskId    String        @map("task_id")
-  task      EstimateTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  title     String
-  minTenths Int           @map("min_tenths") // hours × 10, exact
-  maxTenths Int           @map("max_tenths")
-  comment   String        @default("")
-  position  Int
-  actuals   ActualHours[]
+  id           String        @id @default(uuid())
+  taskId       String        @map("task_id")
+  task         EstimateTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title        String
+  minTenths    Int           @map("min_tenths") // hours × 10, exact
+  maxTenths    Int           @map("max_tenths")
+  comment      String        @default("")
+  position     Int
+  actuals      ActualHours[]
+  // Where an imported Sub task came from (specs/historical-import).
+  sourceFileId String?       @map("source_file_id")
+  sourceFile   UploadedFile? @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  sourceSheet  String?       @map("source_sheet")
+  sourceRow    Int?          @map("source_row")
 
   @@index([taskId, position])
   @@map("sub_task")
@@ -395,4 +407,86 @@ model ActualsUpload {
   expiresAt   DateTime          @map("expires_at")
 
   @@map("actuals_upload")
+}
+
+// ---------- Historical import (specs/historical-import) ----------
+
+enum RequestOrigin {
+  NEW
+  IMPORTED
+}
+
+enum HoursBaseline {
+  AI_ERA
+  PRE_AI
+}
+
+enum UploadedFileKind {
+  ESTIMATE
+  ACTUALS
+}
+
+enum ImportStatus {
+  READY
+  FAILED
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+// Every imported file, identified by content, never by name.
+model UploadedFile {
+  id           String           @id @default(uuid())
+  fileName     String           @map("file_name")
+  bytes        Bytes
+  fingerprint  String
+  kind         UploadedFileKind
+  uploadedById String           @map("uploaded_by_id")
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  subTasks    SubTask[]
+  estimateFor ImportedProject[] @relation("estimateFile")
+  actualsFor  ImportedProject[] @relation("actualsFile")
+
+  @@index([fingerprint])
+  @@map("uploaded_file")
+}
+
+model ImportBatch {
+  id          String            @id @default(uuid())
+  sourceName  String            @map("source_name")
+  notes       String[]
+  createdById String            @map("created_by_id")
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  projects    ImportedProject[]
+
+  @@map("import_batch")
+}
+
+model ImportedProject {
+  id             String             @id @default(uuid())
+  batchId        String             @map("batch_id")
+  batch          ImportBatch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  folder         String
+  position       Int
+  estimateFileId String?            @map("estimate_file_id")
+  estimateFile   UploadedFile?      @relation("estimateFile", fields: [estimateFileId], references: [id], onDelete: SetNull)
+  actualsFileId  String?            @map("actuals_file_id")
+  actualsFile    UploadedFile?      @relation("actualsFile", fields: [actualsFileId], references: [id], onDelete: SetNull)
+  status         ImportStatus
+  failure        String?
+  parsed         Json?
+  actualsParsed  Json?              @map("actuals_parsed")
+  decisions      Json               @default("{}")
+  duplicate      Json?
+  requestId      String?            @map("request_id")
+  request        EstimationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  decidedById    String?            @map("decided_by_id")
+  decidedBy      User?              @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?          @map("decided_at")
+
+  @@index([batchId, position])
+  @@map("imported_project")
 }

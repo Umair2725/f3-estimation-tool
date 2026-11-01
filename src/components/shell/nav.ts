@@ -21,7 +21,10 @@ export function navFor(role: Role | null): NavGroup[] {
       label: "Knowledge base",
       items: [
         { label: "Feature hours", soon: true },
-        { label: "Import past projects", soon: true },
+        // Admins only (specs/historical-import); hidden from everyone else.
+        ...(can(role, "settings.manage")
+          ? [{ label: "Import past projects", href: "/settings/import", match: "/settings/import" }]
+          : []),
         { label: "Actual hours", soon: true },
       ],
     },
