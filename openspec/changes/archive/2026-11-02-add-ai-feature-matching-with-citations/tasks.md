@@ -29,4 +29,4 @@
 
 - [x] 5.1 E2E `e2e/matching.spec.ts` (stub embeddings, no key; run as the Admin so other specs' Estimator drafts are undisturbed): find matches and accept from "Field service app" (the source comment shows); a no-match Task → ask Dev Architect → the Architect adds reference hours on `/references/[id]` → the Admin sees the update, and the suggestion is the Architect reference; "AI guesses aren't set up" is shown.
 - [x] 5.2 Run the full local check (format, lint, typecheck, unit, integration, build, e2e), all passing. Also run the opt-in local-model test once and record its result in the PR.
-- [ ] 5.3 Verify CI is green on the pull request.
+- [x] 5.3 Verify CI is green on the pull request.
