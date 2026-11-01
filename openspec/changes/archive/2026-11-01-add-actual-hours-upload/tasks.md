@@ -31,7 +31,7 @@
 ## 6. Docs and CI
 
 - [x] 6.1 Update the seed (one sample request In delivery with a manual actuals version) and `README.md` (outcomes, recording actual hours, the upload and its rules, the accuracy report); verify the seed stays idempotent
-- [ ] 6.2 Verify CI is green on the pull request
+- [x] 6.2 Verify CI is green on the pull request
 
 ## Workflow follow-up
 
