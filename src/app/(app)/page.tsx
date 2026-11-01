@@ -6,6 +6,9 @@ import { PART_LABELS, STEPS } from "@/lib/estimation/options";
 import { lastActiveLabel } from "@/lib/relative-time";
 import { requireRole } from "@/server/auth/session";
 import { listFilterOptions, listRequests, myDrafts } from "@/server/estimation-requests";
+import { formatHours } from "@/lib/estimation/totals";
+import { latestActualTotals } from "@/server/actuals";
+import { OUTCOME_LABELS } from "@/server/outcome";
 import { RequestFilters } from "./request-filters";
 
 // Home (specs/home-screen, approved design screen 2).
@@ -20,6 +23,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     listRequests(user, filters),
     listFilterOptions(user),
   ]);
+  const actuals = await latestActualTotals(list.rows.map((r) => r.id));
   const now = new Date();
   const firstName = user.name.split(" ")[0] || user.name;
   const filtered = hasActiveFilters(filters);
@@ -128,6 +132,14 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                     </td>
                     <td className="px-3 py-3">
                       <StatusBadge status={row.status} />
+                      {row.outcome !== "NONE" && (
+                        <span
+                          className="mt-1 block text-xs font-semibold text-foreground-2"
+                          data-testid="row-outcome"
+                        >
+                          {OUTCOME_LABELS[row.outcome]}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">{row.ownerName}</td>
                     <td className="px-3 py-3">
@@ -138,6 +150,12 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                       data-testid="request-hours"
                     >
                       {row.hours}
+                      {actuals.has(row.id) && (
+                        <span className="text-muted">
+                          {" "}
+                          · actual {formatHours(actuals.get(row.id)!)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap text-muted">
                       {lastActiveLabel(row.updatedAt, now)}

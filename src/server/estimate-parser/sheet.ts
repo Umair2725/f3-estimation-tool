@@ -12,7 +12,15 @@ import {
 } from "./cells";
 import type { MinMax, ParsedSheet, ParsedTask, ParseWarning, SheetKind } from "./types";
 
-type Columns = { sno: number; task: number; min: number; max: number; comments: number | null };
+type Columns = {
+  sno: number;
+  task: number;
+  min: number;
+  max: number;
+  comments: number | null;
+  // Optional "Actual" column in actual-hours files (specs/actual-hours).
+  actual: number | null;
+};
 type Section = "tasks" | "other" | "research" | "assumptions" | "risks" | "notes";
 
 const MAX_HEADER_ROW = 30;
@@ -51,6 +59,11 @@ function findHeader(ws: ExcelJS.Worksheet): { row: number; cols: Columns } | nul
         (t.startsWith("comment") || t === "notes" || t === "remarks")
       )
         cols.comments = c;
+      else if (
+        cols.actual === undefined &&
+        (t === "actual" || t === "actuals" || t === "actualhours")
+      )
+        cols.actual = c;
     }
     if (cols.sno && cols.task && cols.min && cols.max) {
       return {
@@ -61,6 +74,7 @@ function findHeader(ws: ExcelJS.Worksheet): { row: number; cols: Columns } | nul
           min: cols.min,
           max: cols.max,
           comments: cols.comments ?? null,
+          actual: cols.actual ?? null,
         },
       };
     }
@@ -225,7 +239,16 @@ export function readDevSheet(
       if (min.hours > max.hours)
         warn(`Min is more than Max (${min.hours} > ${max.hours}) for "${label}"`, r, cols.min);
       checkHours();
-      current.subTasks.push({ title: label, min: min.hours, max: max.hours, comment, row: r });
+      const actualCell = cols.actual ? row.getCell(cols.actual).value : null;
+      const actual = hasHoursValue(actualCell) ? readHours(actualCell) : null;
+      current.subTasks.push({
+        title: label,
+        min: min.hours,
+        max: max.hours,
+        comment,
+        row: r,
+        ...(actual && !actual.invalid && !actual.missingResult ? { actual: actual.hours } : {}),
+      });
       continue;
     }
 

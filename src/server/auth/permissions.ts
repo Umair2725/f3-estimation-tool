@@ -18,6 +18,9 @@ const RULES = {
   "estimate.approve": ["TECH_LEAD", "ARCHITECT"],
   // Edit or delete someone else's request (specs/estimation-requests).
   "estimate.edit-any": ["ADMIN"],
+  // Record actual hours and set a project's outcome (specs/actual-hours, specs/project-outcome).
+  "actuals.record": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
+  "outcome.set": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
   "people.manage": ["ADMIN"],
   "settings.manage": ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;

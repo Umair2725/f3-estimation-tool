@@ -88,6 +88,8 @@ type SampleRequest = {
   }[];
   deployment?: Partial<Record<ProjectPart, [number, number]>>;
   assumptions?: Partial<Record<ProjectPart, string[]>>;
+  // A won project with actual hours per Sub task title (specs/actual-hours).
+  actuals?: Record<string, number>;
 };
 
 const SAMPLE_REQUESTS: SampleRequest[] = [
@@ -186,6 +188,7 @@ const SAMPLE_REQUESTS: SampleRequest[] = [
       },
     ],
     deployment: { BACKEND: [12, 16], MOBILE: [8, 12] },
+    actuals: { "Work order API and sync": 18, "Job list and detail": 11, "Offline sync": 22 },
   },
 ];
 
@@ -247,6 +250,7 @@ async function seedRequests() {
       },
     });
     await seedHours(request.id, sample);
+    if (sample.actuals) await seedActuals(request.id, owner.id, sample.actuals);
     console.log(`seeded request "${sample.projectName}" (${sample.client})`);
   }
 }
@@ -291,4 +295,56 @@ async function seedHours(requestId: string, sample: SampleRequest) {
       });
     }
   }
+}
+
+const PART_NAMES: Record<ProjectPart, string> = {
+  BACKEND: "Backend",
+  WEB_FRONTEND: "Web/Frontend",
+  ADMIN_PANEL: "Admin Panel",
+  MOBILE: "Mobile",
+  CLOUD_INFRA: "Cloud/Infrastructure",
+};
+
+/** Marks the request won and records one manual version of actual hours. */
+async function seedActuals(requestId: string, userId: string, actuals: Record<string, number>) {
+  await db.estimationRequest.update({
+    where: { id: requestId },
+    data: { outcome: "IN_DELIVERY", outcomeChangedAt: new Date(), outcomeChangedById: userId },
+  });
+  const subTasks = await db.subTask.findMany({
+    where: { task: { requestPart: { requestId } } },
+    include: {
+      task: {
+        include: {
+          feature: true,
+          requestPart: { include: { technologies: { include: { technology: true } } } },
+        },
+      },
+    },
+  });
+  await db.actualsVersion.create({
+    data: {
+      requestId,
+      number: 1,
+      source: "MANUAL",
+      createdById: userId,
+      rows: {
+        create: subTasks.map((s, position) => {
+          const actual = actuals[s.title];
+          return {
+            subTaskId: s.id,
+            requestPartId: s.task.requestPartId,
+            partLabel: `${PART_NAMES[s.task.requestPart.part]} (${s.task.requestPart.technologies.map((t) => t.technology.name).join(", ")})`,
+            taskTitle: s.task.feature.name,
+            title: s.title,
+            estMinTenths: s.minTenths,
+            estMaxTenths: s.maxTenths,
+            actualTenths: actual === undefined ? null : actual * 10,
+            status: actual === undefined ? "DROPPED" : "MATCHED",
+            position,
+          };
+        }),
+      },
+    },
+  });
 }

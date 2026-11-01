@@ -2,7 +2,9 @@
 
 import { getCurrentUser } from "@/server/auth/session";
 import { createRequest, deleteRequest, getRequest, saveStep } from "@/server/estimation-requests";
+import { setOutcome, type Outcome } from "@/server/outcome";
 import { ServiceError } from "@/server/service-error";
+import { refresh } from "next/cache";
 import type { MissingItem } from "@/lib/estimation/completeness";
 import type { Step } from "@/lib/estimation/options";
 
@@ -41,6 +43,21 @@ export async function saveStepAction(id: string, step: Step, input: unknown): Pr
 export async function deleteRequestAction(id: string): Promise<{ ok: boolean; message?: string }> {
   try {
     await deleteRequest(await getCurrentUser(), id);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ServiceError) return { ok: false, message: err.message };
+    throw err;
+  }
+}
+
+export async function setOutcomeAction(
+  id: string,
+  outcome: Outcome,
+  reason?: string,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await setOutcome(await getCurrentUser(), id, { outcome, reason });
+    refresh();
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { ok: false, message: err.message };

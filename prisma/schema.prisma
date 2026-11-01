@@ -43,6 +43,8 @@ model User {
   invitations RoleInvitation[]
   requests    EstimationRequest[]
   exports     ExportRecord[]
+  actuals     ActualsVersion[]
+  uploads     ActualsUpload[]
 
   @@map("user")
 }
@@ -147,34 +149,41 @@ model Client {
 }
 
 model EstimationRequest {
-  id               String        @id @default(uuid())
-  projectName      String        @map("project_name")
-  clientId         String?       @map("client_id")
-  client           Client?       @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  projectManager   String        @map("project_manager")
-  projectDate      DateTime      @map("project_date") @db.Date
-  status           RequestStatus @default(DRAFT)
-  ownerId          String        @map("owner_id")
-  owner            User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  lastStep         Int           @default(1) @map("last_step")
-  applicationTypes String[]      @map("application_types")
-  operatingSystems String[]      @map("operating_systems")
-  browsers         String[]
-  considerations   Json          @default("{}") // validated by src/lib/estimation/schemas.ts
+  id                 String         @id @default(uuid())
+  projectName        String         @map("project_name")
+  clientId           String?        @map("client_id")
+  client             Client?        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  projectManager     String         @map("project_manager")
+  projectDate        DateTime       @map("project_date") @db.Date
+  status             RequestStatus  @default(DRAFT)
+  ownerId            String         @map("owner_id")
+  owner              User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  lastStep           Int            @default(1) @map("last_step")
+  applicationTypes   String[]       @map("application_types")
+  operatingSystems   String[]       @map("operating_systems")
+  browsers           String[]
+  considerations     Json           @default("{}") // validated by src/lib/estimation/schemas.ts
   // Overheads and price (specs/estimate-hours); new requests copy EstimateDefaults.
-  qaPercent        Int           @default(25) @map("qa_percent")
-  qaEnabled        Boolean       @default(true) @map("qa_enabled")
-  pmPercent        Int           @default(30) @map("pm_percent")
-  pmEnabled        Boolean       @default(true) @map("pm_enabled")
-  bugFixPercent    Int           @default(10) @map("bug_fix_percent")
-  hourlyRate       Int           @default(30) @map("hourly_rate") // USD per hour
-  rateConfirmed    Boolean       @default(false) @map("rate_confirmed")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  qaPercent          Int            @default(25) @map("qa_percent")
+  qaEnabled          Boolean        @default(true) @map("qa_enabled")
+  pmPercent          Int            @default(30) @map("pm_percent")
+  pmEnabled          Boolean        @default(true) @map("pm_enabled")
+  bugFixPercent      Int            @default(10) @map("bug_fix_percent")
+  hourlyRate         Int            @default(30) @map("hourly_rate") // USD per hour
+  rateConfirmed      Boolean        @default(false) @map("rate_confirmed")
+  // What happened after the estimate (specs/project-outcome); separate from the review status.
+  outcome            ProjectOutcome @default(NONE)
+  outcomeReason      String?        @map("outcome_reason")
+  outcomeChangedAt   DateTime?      @map("outcome_changed_at")
+  outcomeChangedById String?        @map("outcome_changed_by_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
-  parts    RequestPart[]
-  features Feature[]
-  exports  ExportRecord[]
+  parts          RequestPart[]
+  features       Feature[]
+  exports        ExportRecord[]
+  actuals        ActualsVersion[]
+  actualsUploads ActualsUpload[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([ownerId, status])
@@ -183,15 +192,16 @@ model EstimationRequest {
 }
 
 model RequestPart {
-  id           String                  @id @default(uuid())
-  requestId    String                  @map("request_id")
-  request      EstimationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  part         ProjectPart
-  technologies RequestPartTechnology[]
-  tasks        EstimateTask[]
+  id                  String                  @id @default(uuid())
+  requestId           String                  @map("request_id")
+  request             EstimationRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  part                ProjectPart
+  technologies        RequestPartTechnology[]
+  tasks               EstimateTask[]
+  actualHours         ActualHours[]
   // Per development sheet; hours in tenths of an hour.
-  deploymentMinTenths Int      @default(0) @map("deployment_min_tenths")
-  deploymentMaxTenths Int      @default(0) @map("deployment_max_tenths")
+  deploymentMinTenths Int                     @default(0) @map("deployment_min_tenths")
+  deploymentMaxTenths Int                     @default(0) @map("deployment_max_tenths")
   assumptions         String[]
   risks               String[]
 
@@ -256,14 +266,15 @@ model EstimateTask {
 }
 
 model SubTask {
-  id        String       @id @default(uuid())
-  taskId    String       @map("task_id")
-  task      EstimateTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid())
+  taskId    String        @map("task_id")
+  task      EstimateTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   title     String
-  minTenths Int          @map("min_tenths") // hours × 10, exact
-  maxTenths Int          @map("max_tenths")
-  comment   String       @default("")
+  minTenths Int           @map("min_tenths") // hours × 10, exact
+  maxTenths Int           @map("max_tenths")
+  comment   String        @default("")
   position  Int
+  actuals   ActualHours[]
 
   @@index([taskId, position])
   @@map("sub_task")
@@ -300,4 +311,88 @@ model ExportRecord {
 
   @@index([requestId, createdAt(sort: Desc)])
   @@map("export_record")
+}
+
+// ---------- Outcome and actual hours (specs/project-outcome, specs/actual-hours) ----------
+
+enum ProjectOutcome {
+  NONE
+  IN_DELIVERY
+  LOST
+  DELIVERED
+}
+
+enum ActualsSource {
+  MANUAL
+  FILE
+}
+
+enum ActualStatus {
+  MATCHED
+  UNPLANNED
+  DROPPED
+}
+
+// One saved set of actual hours; the highest number is the request's current actuals.
+model ActualsVersion {
+  id          String            @id @default(uuid())
+  requestId   String            @map("request_id")
+  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  number      Int
+  source      ActualsSource
+  fileName    String?           @map("file_name")
+  fileBytes   Bytes?            @map("file_bytes")
+  fingerprint String?
+  createdById String            @map("created_by_id")
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  rows        ActualHours[]
+
+  @@unique([requestId, number])
+  @@map("actuals_version")
+}
+
+// One row per estimated Sub task (matched or dropped) and per unplanned row. The estimate is
+// copied in so a version's report never changes when the estimate is edited later.
+model ActualHours {
+  id            String         @id @default(uuid())
+  versionId     String         @map("version_id")
+  version       ActualsVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  subTaskId     String?        @map("sub_task_id")
+  subTask       SubTask?       @relation(fields: [subTaskId], references: [id], onDelete: SetNull)
+  requestPartId String?        @map("request_part_id")
+  requestPart   RequestPart?   @relation(fields: [requestPartId], references: [id], onDelete: SetNull)
+  partLabel     String         @map("part_label")
+  taskTitle     String         @map("task_title")
+  title         String
+  estMinTenths  Int            @default(0) @map("est_min_tenths")
+  estMaxTenths  Int            @default(0) @map("est_max_tenths")
+  actualTenths  Int?           @map("actual_tenths")
+  status        ActualStatus
+  similarity    Float?
+  flags         String[]
+  sourceSheet   String?        @map("source_sheet")
+  sourceRow     Int?           @map("source_row")
+  position      Int
+
+  @@index([versionId, position])
+  @@index([subTaskId])
+  @@map("actual_hours")
+}
+
+// An uploaded actuals file waiting for its preview to be confirmed (expires after a day).
+model ActualsUpload {
+  id          String            @id @default(uuid())
+  requestId   String            @map("request_id")
+  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName    String            @map("file_name")
+  fileBytes   Bytes             @map("file_bytes")
+  fingerprint String
+  parsed      Json
+  createdById String            @map("created_by_id")
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  expiresAt   DateTime          @map("expires_at")
+
+  @@map("actuals_upload")
 }

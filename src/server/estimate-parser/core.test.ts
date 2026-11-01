@@ -266,3 +266,25 @@ describe("files", () => {
     expect(a.fingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+describe("actual-hours files (specs/actual-hours)", () => {
+  it("reads an optional Actual column", async () => {
+    const r = await parse({
+      Web: {
+        8: { B: "S.No", C: "Task", D: "Minimum", E: "Maximum", F: "Actual", G: "Comments" },
+        9: { B: 1, C: "Pages" },
+        10: { C: "Home", D: 4, E: 6, F: 5, G: "Done" },
+        11: { C: "About", D: 2, E: 3 },
+      },
+    });
+    const subTasks = sheet(r, "Web").tasks[0].subTasks;
+    expect(subTasks[0]).toMatchObject({
+      title: "Home",
+      min: 4,
+      max: 6,
+      actual: 5,
+      comment: "Done",
+    });
+    expect(subTasks[1].actual).toBeUndefined();
+  });
+});
