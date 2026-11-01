@@ -29,4 +29,4 @@
 
 - [x] 5.1 E2E `e2e/review.spec.ts`: Estimator submits to Tech Lead → the Tech Lead sees Reviews 1, comments on a Sub task and requests changes → the Estimator sees the update on Home, edits and resubmits → the Tech Lead approves → Approved, with history → Edit as new version gives v2 Draft. Also check that the Estimator has no Reviews entry and that /reviews shows "You don't have access to this page" (the same pattern as Settings).
 - [x] 5.2 Run the full local check (format, lint, typecheck, unit, integration, build, e2e), all passing.
-- [ ] 5.3 Verify CI is green on the pull request.
+- [x] 5.3 Verify CI is green on the pull request.
