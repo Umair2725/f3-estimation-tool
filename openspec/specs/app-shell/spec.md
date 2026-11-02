@@ -19,19 +19,6 @@ Every page SHALL render inside a shared layout with a header that shows the prod
 - **THEN** the layout shows "Sara" and "Estimator"
 - **AND** a "Sign out" control is available
 
-### Requirement: Home page placeholder
-The root path `/` SHALL require sign-in and SHALL show a home page that names the tool, gives a one-line description of its purpose, and states that estimation features are coming soon.
-
-#### Scenario: Open the home page
-- **WHEN** a signed-in user with a role opens `/`
-- **THEN** the page shows the title "F3 Estimation Tool"
-- **AND** a short description of the tool's purpose
-- **AND** a notice that estimation features are not yet available
-
-#### Scenario: Home page while signed out
-- **WHEN** a signed-out visitor opens `/`
-- **THEN** they are redirected to `/sign-in`
-
 ### Requirement: Not-found page
 The system SHALL show a friendly not-found page, inside the shared layout and with a link back to the home page, for any unknown path.
 
