@@ -24,6 +24,7 @@ import {
 import type { Totals } from "@/lib/estimation/totals";
 import { estimateChecklist, estimateTotals, getEstimate, type EstimateView } from "./estimates";
 import { getRequest } from "./estimation-requests";
+import { proposalCount } from "./benchmarks/benchmarks";
 import { reindexRequestSoftly } from "./matching/hooks";
 import { matchingAttention } from "./matching/matching";
 import { storeApprovedVersion } from "./review/snapshot-source";
@@ -494,17 +495,21 @@ export async function listReviews(actor: CurrentUser | null, now = new Date()) {
 }
 
 /** How many requests wait for this person's review (the sidebar count). */
-/** What waits for this person on the Reviews page: reviews, plus reference requests for Architects. */
+/**
+ * What waits for this person on the Reviews page: reviews, plus reference requests and benchmark
+ * proposals for Architects.
+ */
 export async function reviewCount(actor: CurrentUser | null): Promise<number> {
   if (!actor || !can(actor.role, "estimate.approve")) return 0;
   const db = getDb();
-  const [reviews, references] = await Promise.all([
+  const [reviews, references, proposals] = await Promise.all([
     db.estimationRequest.count({ where: { reviewerId: actor.id, status: "IN_REVIEW" } }),
     can(actor.role, "reference.provide")
       ? db.referenceRequest.count({ where: { architectId: actor.id, status: "OPEN" } })
       : 0,
+    proposalCount(actor),
   ]);
-  return reviews + references;
+  return reviews + references + proposals;
 }
 
 export async function unreadNotifications(actor: CurrentUser | null) {

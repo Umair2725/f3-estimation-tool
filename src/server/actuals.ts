@@ -1,5 +1,6 @@
 import "server-only";
-import { reindexRequestSoftly } from "./matching/hooks";
+import { observationsFromActuals } from "./benchmarks/benchmarks";
+import { reindexBenchmarkSoftly, reindexRequestSoftly } from "./matching/hooks";
 import type { CurrentUser } from "@/server/auth/access";
 import { can } from "@/server/auth/permissions";
 import { getDb } from "@/server/db";
@@ -50,7 +51,7 @@ function assertCanRecord(actor: CurrentUser, outcome: Outcome) {
 async function loadRequest(db: Tx | ReturnType<typeof getDb>, id: string) {
   const request = await db.estimationRequest.findUnique({
     where: { id },
-    select: { id: true, projectName: true, outcome: true, ownerId: true },
+    select: { id: true, projectName: true, outcome: true, ownerId: true, baseline: true },
   });
   if (!request) throw new ServiceError("Request not found", 404);
   return request;
@@ -108,7 +109,8 @@ export type ActualsRow = {
 };
 
 export type ActualsView = {
-  request: { id: string; projectName: string; outcome: Outcome };
+  /** aiEra: saving asks for the team level (specs/actual-hours "Team level feeds benchmarks"). */
+  request: { id: string; projectName: string; outcome: Outcome; aiEra: boolean };
   canRecord: boolean;
   estimate: EstimatePart[];
   /** The latest version's rows, or the estimate with no actuals yet. */
@@ -175,7 +177,12 @@ export async function getActuals(actor: CurrentUser | null, id: string): Promise
     );
   }
   return {
-    request: { id: request.id, projectName: request.projectName, outcome: request.outcome },
+    request: {
+      id: request.id,
+      projectName: request.projectName,
+      outcome: request.outcome,
+      aiEra: request.baseline === "AI_ERA",
+    },
     canRecord: canRecordActuals(actor, request.outcome),
     estimate,
     rows,
@@ -223,11 +230,28 @@ export async function latestActualTotals(requestIds: string[]): Promise<Map<stri
 
 type NewRow = Omit<Prisma.ActualHoursCreateManyInput, "versionId">;
 
+export const TEAM_LEVEL_REQUIRED = "Choose the team level";
+const TEAM_LEVELS = ["EXPERIENCED", "JUNIOR", "MIXED"] as const;
+export type TeamLevel = (typeof TEAM_LEVELS)[number];
+
+/**
+ * AI-era requests need the team level so actual hours can feed benchmarks (specs/actual-hours
+ * "Team level feeds benchmarks"); imported pre-AI projects never ask.
+ */
+function teamLevelFor(baseline: "PRE_AI" | "AI_ERA", level: unknown): TeamLevel | null {
+  if (baseline === "PRE_AI") return null;
+  if (typeof level !== "string" || !TEAM_LEVELS.includes(level as TeamLevel)) {
+    throw new ServiceError(TEAM_LEVEL_REQUIRED, 400, { teamLevel: TEAM_LEVEL_REQUIRED });
+  }
+  return level as TeamLevel;
+}
+
 async function createVersion(
   tx: Tx,
   actor: CurrentUser,
   requestId: string,
   rows: NewRow[],
+  teamLevel: TeamLevel | null,
   file?: { fileName: string; bytes: Uint8Array; fingerprint: string },
 ) {
   const last = await tx.actualsVersion.findFirst({
@@ -243,11 +267,13 @@ async function createVersion(
       fileBytes: file ? Buffer.from(file.bytes) : undefined,
       fingerprint: file?.fingerprint,
       createdById: actor.id,
+      teamLevel,
     },
   });
   if (rows.length)
     await tx.actualHours.createMany({ data: rows.map((r) => ({ ...r, versionId: version.id })) });
-  return version;
+  const benchmarks = await observationsFromActuals(tx, version.id);
+  return { ...version, benchmarks };
 }
 
 function checkHours(value: number, field: string) {
@@ -256,6 +282,8 @@ function checkHours(value: number, field: string) {
 }
 
 export type ManualInput = {
+  /** Who did the work; required for AI-era requests. */
+  teamLevel?: TeamLevel | null;
   rows: {
     subTaskId?: string;
     unplanned?: { requestPartId: string; taskTitle: string; title: string };
@@ -269,6 +297,7 @@ export async function saveManualVersion(actor: CurrentUser | null, id: string, i
   const version = await getDb().$transaction(async (tx) => {
     const request = await loadRequest(tx, id);
     assertCanRecord(actor, request.outcome);
+    const teamLevel = teamLevelFor(request.baseline, input.teamLevel);
     const estimate = await estimateParts(tx, id);
     const given = new Map(
       input.rows.filter((r) => r.subTaskId).map((r) => [r.subTaskId!, r.actual]),
@@ -313,10 +342,11 @@ export async function saveManualVersion(actor: CurrentUser | null, id: string, i
         });
       }
     }
-    return createVersion(tx, actor, id, rows);
+    return createVersion(tx, actor, id, rows, teamLevel);
   });
-  // Indexed entries carry actual hours (specs/feature-matching).
+  // Indexed entries carry actual hours (specs/feature-matching); benchmarks were recalculated.
   await reindexRequestSoftly(id);
+  for (const b of version.benchmarks) await reindexBenchmarkSoftly(b);
   return version;
 }
 
@@ -388,6 +418,7 @@ async function loadUpload(db: Tx | ReturnType<typeof getDb>, id: string, uploadI
 }
 
 export type UploadPreview = {
+  aiEra: boolean;
   fileName: string;
   sheets: FileSheet[];
   match: MatchResult;
@@ -409,6 +440,7 @@ export async function previewUpload(
   const parsed = upload.parsed as unknown as StoredParse;
   const estimate = await estimateParts(db, id);
   return {
+    aiEra: request.baseline === "AI_ERA",
     fileName: upload.fileName,
     sheets: parsed.sheets,
     match: matchActuals(estimate, parsed.sheets, decisions),
@@ -422,12 +454,14 @@ export async function saveUploadVersion(
   id: string,
   uploadId: string,
   decisions: MatchDecisions = {},
+  teamLevelInput?: TeamLevel | null,
 ) {
   assertAccess(actor);
   for (const [key, value] of Object.entries(decisions.hours ?? {})) checkHours(value, key);
   const saved = await getDb().$transaction(async (tx) => {
     const request = await loadRequest(tx, id);
     assertCanRecord(actor, request.outcome);
+    const teamLevel = teamLevelFor(request.baseline, teamLevelInput);
     const upload = await loadUpload(tx, id, uploadId);
     const parsed = upload.parsed as unknown as StoredParse;
     const match = matchActuals(await estimateParts(tx, id), parsed.sheets, decisions);
@@ -450,7 +484,7 @@ export async function saveUploadVersion(
       sourceRow: r.sourceRow,
       position,
     }));
-    const version = await createVersion(tx, actor, id, rows, {
+    const version = await createVersion(tx, actor, id, rows, teamLevel, {
       fileName: upload.fileName,
       bytes: upload.fileBytes,
       fingerprint: upload.fingerprint,
@@ -459,6 +493,7 @@ export async function saveUploadVersion(
     return version;
   });
   await reindexRequestSoftly(id);
+  for (const b of saved.benchmarks) await reindexBenchmarkSoftly(b);
   return saved;
 }
 

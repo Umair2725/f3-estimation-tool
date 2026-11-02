@@ -1,9 +1,11 @@
 // Matching (specs/feature-matching). Pure: the texts that are embedded, and how a suggestion is
 // chosen from the matches, so the order and every label are tested without a database.
 
-export type KnowledgeKind = "APPROVED_PRE_AI" | "APPROVED_AI_ERA" | "ARCHITECT_REFERENCE";
+export type KnowledgeKind =
+  "APPROVED_PRE_AI" | "APPROVED_AI_ERA" | "BENCHMARK_CONFIRMED" | "BENCHMARK_DRAFT";
 export type SuggestionMethod =
-  | "ARCHITECT_REFERENCE"
+  | "BENCHMARK_CONFIRMED"
+  | "BENCHMARK_DRAFT"
   | "AI_ERA_ACTUALS"
   | "AI_ERA_ESTIMATE"
   | "PRE_AI_MATCH"
@@ -63,6 +65,15 @@ export type Match = {
   maxTenths: number;
   actualTenths: number | null;
   sourceDate: string; // ISO date
+  /** Set for benchmark entries (specs/feature-benchmarks). */
+  benchmark?: {
+    id: string;
+    code: string;
+    status: "DRAFT" | "CONFIRMED" | "RETIRED";
+    confirmedByName: string | null;
+    projectsCount: number;
+    updatedAt: string; // ISO date
+  } | null;
 };
 
 export type SuggestedSubTask = {
@@ -70,6 +81,8 @@ export type SuggestedSubTask = {
   minTenths: number;
   maxTenths: number;
   comment: string;
+  /** Sub tasks taken from a benchmark stay linked to it, so actuals can feed it. */
+  benchmarkId?: string;
 };
 
 export type Suggestion = {
@@ -81,7 +94,8 @@ export type Suggestion = {
 };
 
 export const METHOD_LABELS: Record<SuggestionMethod, string> = {
-  ARCHITECT_REFERENCE: "Architect reference",
+  BENCHMARK_CONFIRMED: "Confirmed benchmark",
+  BENCHMARK_DRAFT: "Draft benchmark, not confirmed yet",
   AI_ERA_ACTUALS: "Based on actual hours (AI era)",
   AI_ERA_ESTIMATE: "Approved AI-era estimate",
   PRE_AI_MATCH: "Pre-AI hours: the AI reduction isn't applied yet",
@@ -91,13 +105,14 @@ export const METHOD_LABELS: Record<SuggestionMethod, string> = {
 
 export const AI_GUESS_NOTE = "AI-generated, no historical reference";
 
-/** "Patient portal MVP v1, Backend (Node.js)" or "Architect reference by Dev Architect". */
+const isBenchmark = (kind: KnowledgeKind) =>
+  kind === "BENCHMARK_CONFIRMED" || kind === "BENCHMARK_DRAFT";
+
+/** "Patient portal MVP v1, Backend (Node.js)" or "benchmark FB-012". */
 export function sourceName(
-  match: Pick<Match, "kind" | "projectName" | "version" | "partLabel" | "authorName">,
+  match: Pick<Match, "kind" | "projectName" | "version" | "partLabel" | "benchmark">,
 ) {
-  if (match.kind === "ARCHITECT_REFERENCE") {
-    return `Architect reference by ${match.authorName ?? "an Architect"}`;
-  }
+  if (isBenchmark(match.kind)) return `benchmark ${match.benchmark?.code ?? "(unknown)"}`;
   return `${match.projectName ?? "Unknown project"} v${match.version ?? 1}, ${match.partLabel}`;
 }
 
@@ -116,6 +131,7 @@ function fromMatch(method: SuggestionMethod, match: Match): Suggestion {
       minTenths: actual ?? s.minTenths,
       maxTenths: actual ?? s.maxTenths,
       comment: note,
+      ...(match.benchmark ? { benchmarkId: match.benchmark.id } : {}),
     };
   });
   const total = sum(subTasks);
@@ -124,14 +140,16 @@ function fromMatch(method: SuggestionMethod, match: Match): Suggestion {
 
 /**
  * The suggestion order (specs/feature-matching "Suggestion order and labels"): among matches at
- * or above the threshold, an Architect reference, then AI-era actual hours, then an approved
- * AI-era estimate, then the most similar pre-AI match; otherwise "No reliable match". Matches
- * arrive most similar first.
+ * or above the threshold, a Confirmed benchmark, then a Draft benchmark, then AI-era actual
+ * hours, then an approved AI-era estimate, then the most similar pre-AI match; otherwise "No
+ * reliable match". Matches arrive most similar first.
  */
 export function chooseSuggestion(matches: Match[], threshold: number): Suggestion {
   const reliable = matches.filter((m) => m.similarity >= threshold);
-  const reference = reliable.find((m) => m.kind === "ARCHITECT_REFERENCE");
-  if (reference) return fromMatch("ARCHITECT_REFERENCE", reference);
+  for (const kind of ["BENCHMARK_CONFIRMED", "BENCHMARK_DRAFT"] as const) {
+    const benchmark = reliable.find((m) => m.kind === kind);
+    if (benchmark) return fromMatch(kind, benchmark);
+  }
   const actuals = reliable.find((m) => m.kind === "APPROVED_AI_ERA" && m.actualTenths !== null);
   if (actuals) return fromMatch("AI_ERA_ACTUALS", actuals);
   const aiEra = reliable.find((m) => m.kind === "APPROVED_AI_ERA");

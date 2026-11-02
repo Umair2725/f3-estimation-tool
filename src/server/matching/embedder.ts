@@ -48,15 +48,19 @@ export function tokens(text: string): string[] {
  */
 export const stubEmbedder: Embedder = {
   name: "stub",
-  // Calibrated on sample pairs: related 0.50–0.89, unrelated 0 or below.
+  // Calibrated on sample pairs: related 0.48–0.89, unrelated 0 or below; random two-word
+  // names score at most 0.28 against an unrelated entry (2,000 tries).
   threshold: 0.4,
   async embed(texts) {
     return texts.map((text) => {
       const vector = new Array<number>(DIMENSIONS).fill(0);
       const body = text.includes(":") ? text.slice(text.indexOf(":") + 1) : text;
       for (const word of tokens(body)) {
+        // Three signed slots per word: one accidental collision adds only a third of a word.
         const hash = createHash("sha1").update(word).digest();
-        vector[hash.readUInt16BE(0) % DIMENSIONS] += hash[2] & 1 ? 1 : -1;
+        for (let k = 0; k < 3; k++) {
+          vector[hash.readUInt16BE(k * 3) % DIMENSIONS] += hash[k * 3 + 2] & 1 ? 1 : -1;
+        }
       }
       return normalize(vector);
     });

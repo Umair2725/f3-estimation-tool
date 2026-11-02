@@ -2,9 +2,12 @@
 // Run with `npm run db:seed`. Refuses to run unless AUTH_DEV_LOGIN=1 outside production.
 // Safe to run repeatedly: users are matched by email and brought back to the state below.
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 import { PrismaClient, type ProjectPart, type Role } from "../src/generated/prisma/client";
+import { readCsv } from "../src/lib/benchmarks/rows";
+import { recalculated } from "../src/lib/benchmarks/recalc";
 import { embedderFor } from "../src/server/matching/embedder";
 import { reindexAll } from "../src/server/matching/knowledge";
 import { backfillApproved, storeApprovedVersion } from "../src/server/review/snapshot-source";
@@ -72,6 +75,7 @@ async function main() {
   // Users only: tests that change people reset them without touching requests other tests use.
   if (process.env.SEED_USERS_ONLY === "1") return;
   await seedRequests();
+  await seedBenchmarks();
   const backfilled = await backfillApproved(db);
   if (backfilled) console.log(`approved versions backfilled: ${backfilled}`);
   // The matching index (specs/feature-matching): stub vectors in tests, the local model otherwise.
@@ -399,4 +403,101 @@ async function seedActuals(requestId: string, userId: string, actuals: Record<st
       },
     },
   });
+}
+
+// Feature benchmarks (specs/feature-benchmarks): the 166-row seed list, plus three development
+// sample values (clearly labelled, not real data) so matching can show benchmarks in the demo.
+const SAMPLE_NOTE = "Development sample, not real data";
+const SAMPLES: { code: string; experienced: number; junior: number; confirm: boolean }[] = [
+  { code: "FB-023", experienced: 3, junior: 5, confirm: true }, // Sign up API, Backend (Node.js)
+  { code: "FB-012", experienced: 4, junior: 6, confirm: false }, // Sign up form, Web/Frontend
+  { code: "FB-027", experienced: 2, junior: 3, confirm: false }, // Forgot password API, Backend
+];
+
+async function seedBenchmarks() {
+  const { rows, problems } = readCsv(readFileSync("data/feature-benchmarks.csv", "utf8"));
+  if (problems.length) throw new Error(`data/feature-benchmarks.csv: ${problems[0].message}`);
+  for (const r of rows) {
+    const data = {
+      module: r.module,
+      feature: r.feature,
+      part: r.part,
+      stack: r.stack,
+      included: r.included,
+      preAiMinTenths: r.preAiMinTenths,
+      preAiMaxTenths: r.preAiMaxTenths,
+      preAiSource: r.preAiSource || null,
+    };
+    await db.featureBenchmark.upsert({
+      where: { code: r.code },
+      create: { ...data, code: r.code },
+      update: data,
+    });
+  }
+  const architect = await db.user.findUniqueOrThrow({
+    where: { email: "dev.architect@folio3.com" },
+  });
+  const lead = await db.user.findUniqueOrThrow({ where: { email: "dev.techlead@folio3.com" } });
+  for (const sample of SAMPLES) {
+    const b = await db.featureBenchmark.findUniqueOrThrow({ where: { code: sample.code } });
+    // Back to the sample state on every run.
+    await db.benchmarkObservation.deleteMany({ where: { benchmarkId: b.id } });
+    await db.benchmarkChange.deleteMany({ where: { benchmarkId: b.id } });
+    const observedOn = new Date(Date.now() - 20 * 86_400_000);
+    const observations = await Promise.all(
+      (
+        [
+          ["EXPERIENCED", sample.experienced],
+          ["JUNIOR", sample.junior],
+        ] as const
+      ).map(([level, hours]) =>
+        db.benchmarkObservation.create({
+          data: {
+            benchmarkId: b.id,
+            level,
+            hoursTenths: hours * 10,
+            observedOn,
+            source: "SURVEY",
+            aiTools: "Claude Code",
+            note: SAMPLE_NOTE,
+            createdById: lead.id,
+          },
+        }),
+      ),
+    );
+    const next = recalculated(
+      { experienced: null, junior: null },
+      observations.map((o) => ({ ...o, level: o.level })),
+      new Date(),
+    );
+    await db.featureBenchmark.update({
+      where: { id: b.id },
+      data: {
+        experiencedTenths: next.experienced,
+        juniorTenths: next.junior,
+        aiTools: "Claude Code",
+        projectsCount: 1,
+        notes: SAMPLE_NOTE,
+        status: sample.confirm ? "CONFIRMED" : "DRAFT",
+        confirmedById: sample.confirm ? architect.id : null,
+        confirmedAt: sample.confirm ? new Date() : null,
+      },
+    });
+    await db.benchmarkChange.create({
+      data: {
+        benchmarkId: b.id,
+        kind: "RECALCULATED",
+        toExperienced: next.experienced,
+        toJunior: next.junior,
+        observationIds: observations.map((o) => o.id),
+        note: SAMPLE_NOTE,
+      },
+    });
+    if (sample.confirm) {
+      await db.benchmarkChange.create({
+        data: { benchmarkId: b.id, kind: "CONFIRMED", actorId: architect.id },
+      });
+    }
+  }
+  console.log(`seeded ${rows.length} feature benchmarks (${SAMPLES.length} with sample hours)`);
 }

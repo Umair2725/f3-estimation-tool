@@ -17,6 +17,7 @@ const match = (over: Partial<Match> = {}): Match => ({
   projectName: "Patient portal MVP",
   clientName: "Northwind Clinics",
   authorName: null,
+  benchmark: null,
   partLabel: "Backend (Node.js)",
   title: "Login",
   subTasks: [
@@ -49,7 +50,25 @@ describe("texts (specs/feature-matching)", () => {
 describe("chooseSuggestion order", () => {
   const T = 0.77;
 
-  it("prefers an Architect reference, then AI-era actuals, then an AI-era estimate, then pre-AI", () => {
+  const bench = (status: "CONFIRMED" | "DRAFT", id: string, similarity: number) =>
+    match({
+      id,
+      kind: status === "CONFIRMED" ? "BENCHMARK_CONFIRMED" : "BENCHMARK_DRAFT",
+      similarity,
+      requestId: null,
+      version: null,
+      projectName: null,
+      benchmark: {
+        id: `b-${id}`,
+        code: `FB-${id}`,
+        status,
+        confirmedByName: status === "CONFIRMED" ? "Dev Architect" : null,
+        projectsCount: 2,
+        updatedAt: "2026-10-01",
+      },
+    });
+
+  it("prefers benchmarks (Confirmed, then Draft), then actuals, an AI-era estimate, then pre-AI", () => {
     const pre = match({ id: "pre", similarity: 0.95 });
     const estimate = match({ id: "est", kind: "APPROVED_AI_ERA", similarity: 0.9 });
     const actuals = match({
@@ -58,16 +77,10 @@ describe("chooseSuggestion order", () => {
       similarity: 0.85,
       actualTenths: 100,
     });
-    const reference = match({
-      id: "ref",
-      kind: "ARCHITECT_REFERENCE",
-      similarity: 0.8,
-      requestId: null,
-      version: null,
-      projectName: null,
-      authorName: "Dev Architect",
-    });
-    expect(chooseSuggestion([pre, estimate, actuals, reference], T).source?.id).toBe("ref");
+    const draft = bench("DRAFT", "draft", 0.95);
+    const confirmed = bench("CONFIRMED", "conf", 0.8);
+    expect(chooseSuggestion([pre, draft, estimate, actuals, confirmed], T).source?.id).toBe("conf");
+    expect(chooseSuggestion([pre, draft, estimate, actuals], T).source?.id).toBe("draft");
     expect(chooseSuggestion([pre, estimate, actuals], T).method).toBe("AI_ERA_ACTUALS");
     expect(chooseSuggestion([pre, estimate], T).method).toBe("AI_ERA_ESTIMATE");
     expect(chooseSuggestion([pre], T).method).toBe("PRE_AI_MATCH");
@@ -82,8 +95,9 @@ describe("chooseSuggestion order", () => {
       maxTenths: null,
     });
     expect(chooseSuggestion([match({ similarity: 0.77 })], T).method).toBe("PRE_AI_MATCH");
-    const lowReference = match({ kind: "ARCHITECT_REFERENCE", similarity: 0.5, authorName: "A" });
-    expect(chooseSuggestion([lowReference, match()], T).method).toBe("PRE_AI_MATCH");
+    expect(chooseSuggestion([bench("CONFIRMED", "low", 0.5), match()], T).method).toBe(
+      "PRE_AI_MATCH",
+    );
   });
 
   it("copies Sub tasks with a source comment, and uses actual hours for AI-era actuals", () => {
@@ -111,10 +125,18 @@ describe("chooseSuggestion order", () => {
     ]);
   });
 
+  it("links benchmark Sub tasks to their benchmark", () => {
+    const b = chooseSuggestion([bench("CONFIRMED", "012", 0.9)], T);
+    expect(b.method).toBe("BENCHMARK_CONFIRMED");
+    expect(b.subTasks?.[0]).toMatchObject({
+      comment: "From benchmark FB-012",
+      benchmarkId: "b-012",
+    });
+    expect(chooseSuggestion([match()], T).subTasks?.[0].benchmarkId).toBeUndefined();
+  });
+
   it("names sources and labels every method", () => {
-    expect(sourceName(match({ kind: "ARCHITECT_REFERENCE", authorName: "Dev Architect" }))).toBe(
-      "Architect reference by Dev Architect",
-    );
+    expect(sourceName(bench("DRAFT", "9001", 0.9))).toBe("benchmark FB-9001");
     expect(METHOD_LABELS.PRE_AI_MATCH).toBe("Pre-AI hours: the AI reduction isn't applied yet");
     expect(METHOD_LABELS.AI_GUESS).toBe("AI-generated, no historical reference");
   });

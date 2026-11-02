@@ -10,6 +10,7 @@ import {
 import { getCurrentUser } from "@/server/auth/session";
 import { ServiceError } from "@/server/service-error";
 import type { MatchDecisions } from "@/lib/actuals/match";
+import type { TeamLevel } from "@/server/actuals";
 
 export type ActualsResult = { ok: true; versionNumber?: number } | { ok: false; message: string };
 
@@ -29,8 +30,15 @@ export async function saveManualAction(id: string, input: ManualInput) {
   return run(async () => saveManualVersion(await getCurrentUser(), id, input));
 }
 
-export async function saveUploadAction(id: string, uploadId: string, decisions: MatchDecisions) {
-  return run(async () => saveUploadVersion(await getCurrentUser(), id, uploadId, decisions));
+export async function saveUploadAction(
+  id: string,
+  uploadId: string,
+  decisions: MatchDecisions,
+  teamLevel?: TeamLevel | null,
+) {
+  return run(async () =>
+    saveUploadVersion(await getCurrentUser(), id, uploadId, decisions, teamLevel),
+  );
 }
 
 export async function discardUploadAction(id: string, uploadId: string) {

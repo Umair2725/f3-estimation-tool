@@ -22,7 +22,8 @@ import { partLabel } from "../review/snapshot-source";
 import { assertAccess, ServiceError } from "../service-error";
 import { aiGuessesEnabled, guess, GUESS_FAILED } from "./ai-guess";
 import { embedderFor } from "./embedder";
-import { indexReference, searchKnowledge } from "./knowledge";
+import { createReferenceBenchmark } from "../benchmarks/benchmarks";
+import { indexBenchmark, searchKnowledge } from "./knowledge";
 
 // Matching (specs/feature-matching): find matches, decide on suggestions, ask an Architect for
 // reference hours, and the optional AI guess. Every function checks the caller itself.
@@ -251,6 +252,8 @@ export async function decideSuggestion(
           minTenths: s.minTenths,
           maxTenths: s.maxTenths,
           comment: s.comment.slice(0, 1000),
+          // Kept so actual hours can flow back to the benchmark (specs/feature-matching).
+          benchmarkId: s.benchmarkId ?? null,
           position,
         })),
       });
@@ -507,20 +510,18 @@ export async function answerReference(
   const db = getDb();
   const result = await db.$transaction(async (tx) => {
     const r = await loadOpenForArchitect(tx, actor, id);
-    const created = await tx.featureReference.create({
-      data: {
-        title: reference.title,
-        description: reference.description,
-        part: r.part,
-        stack: r.stack,
-        subTasks: reference.subTasks as unknown as Prisma.InputJsonValue,
-        authorId: actor.id,
-        requestId: r.requestId,
-      },
+    // Stored as a Draft benchmark (specs/feature-matching "Architect adds reference hours").
+    const created = await createReferenceBenchmark(tx, {
+      title: reference.title,
+      description: reference.description,
+      part: r.part,
+      stack: r.stack,
+      subTasks: reference.subTasks,
+      authorId: actor.id,
     });
     await tx.referenceRequest.update({
       where: { id },
-      data: { status: "ANSWERED", referenceId: created.id, answeredAt: new Date() },
+      data: { status: "ANSWERED", benchmarkId: created.id, answeredAt: new Date() },
     });
     await notify(tx, {
       userId: r.askedById,
@@ -528,15 +529,20 @@ export async function answerReference(
       kind: "REFERENCE_ADDED",
       actorId: actor.id,
     });
-    return { referenceId: created.id, requestId: r.requestId, taskId: r.taskId };
+    return {
+      benchmarkId: created.id,
+      code: created.code,
+      requestId: r.requestId,
+      taskId: r.taskId,
+    };
   });
   // Indexed at once for all future matching, then this Task's suggestion is refreshed.
   try {
-    await indexReference(db, getEmbedder(), result.referenceId);
+    await indexBenchmark(db, getEmbedder(), result.benchmarkId);
     if (result.taskId) await computeSuggestions(result.requestId, [result.taskId]);
   } catch (err) {
-    logger.error("indexing the Architect reference failed; run npm run reindex-knowledge", {
-      referenceId: result.referenceId,
+    logger.error("indexing the reference benchmark failed; run npm run reindex-knowledge", {
+      benchmarkId: result.benchmarkId,
       err,
     });
   }

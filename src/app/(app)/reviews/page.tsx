@@ -4,6 +4,8 @@ import { ui } from "@/components/ui";
 import { lastActiveLabel } from "@/lib/relative-time";
 import { can } from "@/server/auth/permissions";
 import { requireRole } from "@/server/auth/session";
+import { range } from "@/lib/benchmarks/labels";
+import { listProposals } from "@/server/benchmarks/benchmarks";
 import { listReferenceRequests } from "@/server/matching/matching";
 import { listReviews } from "@/server/review";
 
@@ -25,6 +27,7 @@ export default async function ReviewsPage() {
   }
   const { waiting, recent } = await listReviews(user);
   const references = can(user.role, "reference.provide") ? await listReferenceRequests(user) : null;
+  const proposals = can(user.role, "benchmark.decide") ? await listProposals(user) : null;
   const now = new Date();
 
   return (
@@ -103,6 +106,43 @@ export default async function ReviewsPage() {
                   </div>
                   <Link href={`/references/${r.id}`} className={ui.smallButton}>
                     Add reference hours
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {proposals && (
+        <section aria-labelledby="proposals-title" className={ui.card}>
+          <div className={ui.cardHead}>
+            <h2 id="proposals-title" className="text-lg font-bold">
+              Benchmark changes to confirm
+            </h2>
+            <span className="text-sm text-muted">{proposals.length}</span>
+          </div>
+          {proposals.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted">No benchmark changes are waiting.</p>
+          ) : (
+            <ul className="divide-y divide-border" data-testid="benchmark-proposals">
+              {proposals.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold break-words">
+                      {p.code} · {p.feature}
+                    </div>
+                    <div className="text-sm text-muted">
+                      {range(p.from.experienced, p.from.junior)} →{" "}
+                      {range(p.to.experienced, p.to.junior)} from {p.observations} observations ·{" "}
+                      {lastActiveLabel(p.createdAt, now).toLowerCase()}
+                    </div>
+                  </div>
+                  <Link href={`/benchmarks/${p.id}`} className={ui.smallButton}>
+                    Review change
                   </Link>
                 </li>
               ))}

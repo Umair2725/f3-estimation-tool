@@ -94,6 +94,7 @@ describe("recording actual hours (specs/actual-hours)", () => {
     const id = await wonRequest(owner);
     const ids = await subTaskIds(owner, id);
     await saveManualVersion(lead, id, {
+      teamLevel: "EXPERIENCED",
       rows: [
         { subTaskId: ids["User login"], actual: 10 },
         { subTaskId: ids["Booking API"], actual: 38 },
@@ -121,7 +122,10 @@ describe("recording actual hours (specs/actual-hours)", () => {
     expect(view.report!.actualTotal).toBe(54);
     expect((await latestActualTotals([id])).get(id)).toBe(54);
 
-    await saveManualVersion(lead, id, { rows: [{ subTaskId: ids["User login"], actual: 12 }] });
+    await saveManualVersion(lead, id, {
+      teamLevel: "EXPERIENCED",
+      rows: [{ subTaskId: ids["User login"], actual: 12 }],
+    });
     expect((await getActuals(owner, id)).history.map((h) => h.number)).toEqual([2, 1]);
   });
 
@@ -130,14 +134,20 @@ describe("recording actual hours (specs/actual-hours)", () => {
     const lead = await person("TECH_LEAD");
     const admin = await person("ADMIN");
     const notWon = await wonRequest(owner, false);
-    await expect(saveManualVersion(lead, notWon, { rows: [] })).rejects.toThrow(NOT_WON_MESSAGE);
+    await expect(
+      saveManualVersion(lead, notWon, { teamLevel: "EXPERIENCED", rows: [] }),
+    ).rejects.toThrow(NOT_WON_MESSAGE);
 
     const id = await wonRequest(owner);
-    await expect(saveManualVersion(owner, id, { rows: [] })).rejects.toMatchObject({ status: 403 });
+    await expect(
+      saveManualVersion(owner, id, { teamLevel: "EXPERIENCED", rows: [] }),
+    ).rejects.toMatchObject({ status: 403 });
     expect((await getActuals(owner, id)).canRecord).toBe(false);
     await setOutcome(lead, id, { outcome: "DELIVERED" });
-    await expect(saveManualVersion(lead, id, { rows: [] })).rejects.toThrow(LOCKED_MESSAGE);
-    await saveManualVersion(admin, id, { rows: [] });
+    await expect(
+      saveManualVersion(lead, id, { teamLevel: "EXPERIENCED", rows: [] }),
+    ).rejects.toThrow(LOCKED_MESSAGE);
+    await saveManualVersion(admin, id, { teamLevel: "EXPERIENCED", rows: [] });
     await expect(getActuals(await person(null), id)).rejects.toMatchObject({ status: 403 });
   });
 
@@ -147,7 +157,10 @@ describe("recording actual hours (specs/actual-hours)", () => {
     const id = await wonRequest(owner);
     const ids = await subTaskIds(owner, id);
     await expect(
-      saveManualVersion(lead, id, { rows: [{ subTaskId: ids["User login"], actual: 2.25 }] }),
+      saveManualVersion(lead, id, {
+        teamLevel: "EXPERIENCED",
+        rows: [{ subTaskId: ids["User login"], actual: 2.25 }],
+      }),
     ).rejects.toMatchObject({
       status: 400,
     });
@@ -212,9 +225,13 @@ describe("actuals upload (specs/actual-hours)", () => {
     expect(byTitle["Image uploader"]).toMatchObject({ status: "DROPPED" });
     expect(await getDb().actualsVersion.count({ where: { requestId: id } })).toBe(0); // nothing stored yet
 
-    const version = await saveUploadVersion(lead, id, uploadId, {
-      hours: { [byTitle["Booking API"].key]: 39 },
-    });
+    const version = await saveUploadVersion(
+      lead,
+      id,
+      uploadId,
+      { hours: { [byTitle["Booking API"].key]: 39 } },
+      "EXPERIENCED",
+    );
     expect(version).toMatchObject({ number: 1, source: "FILE", fileName: "Actuals.xlsx" });
     expect(version.fingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(await getDb().actualsUpload.count({ where: { id: uploadId } })).toBe(0);
@@ -244,7 +261,13 @@ describe("actuals upload (specs/actual-hours)", () => {
     const login = (await previewUpload(lead, id, uploadId)).match.rows.find(
       (r) => r.title === "User login",
     )!;
-    await saveUploadVersion(lead, id, uploadId, { rejected: [`${login.key}>${login.subTaskId}`] });
+    await saveUploadVersion(
+      lead,
+      id,
+      uploadId,
+      { rejected: [`${login.key}>${login.subTaskId}`] },
+      "EXPERIENCED",
+    );
     const status = Object.fromEntries(
       (await getActuals(owner, id)).rows.map((r) => [r.title, r.status]),
     );
