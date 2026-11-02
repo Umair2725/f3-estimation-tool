@@ -33,6 +33,12 @@ describe("validateEnv: database and basics", () => {
         EMBEDDINGS_CACHE_DIR: undefined,
         ANTHROPIC_API_KEY: undefined,
         ANTHROPIC_MODEL: undefined,
+        SMTP_HOST: undefined,
+        SMTP_PORT: 465,
+        SMTP_SECURE: undefined,
+        SMTP_USER: undefined,
+        SMTP_PASSWORD: undefined,
+        MAIL_FROM: undefined,
       },
     });
   });
@@ -173,5 +179,43 @@ describe("formatProblems", () => {
     expect(text).not.toContain("s3cret");
     expect(text).not.toContain("db.internal");
     expect(text).not.toContain(authSecret);
+  });
+});
+
+describe("validateEnv: email", () => {
+  const smtp = {
+    SMTP_HOST: "smtp.gmail.com",
+    SMTP_USER: "estimation@folio3.com",
+    SMTP_PASSWORD: "app-pass-s3cret",
+    MAIL_FROM: "estimation@folio3.com",
+  };
+
+  it("treats email as optional", () => {
+    expect(problemsOf(base)).toEqual([]);
+  });
+
+  it("accepts a complete SMTP setup with port and secure defaults", () => {
+    const result = validateEnv({ ...base, ...smtp });
+    expect(result.ok && result.env.SMTP_PORT).toBe(465);
+    expect(result.ok && result.env.SMTP_SECURE).toBeUndefined();
+    const custom = validateEnv({ ...base, ...smtp, SMTP_PORT: "587", SMTP_SECURE: "false" });
+    expect(custom.ok && [custom.env.SMTP_PORT, custom.env.SMTP_SECURE]).toEqual([587, "false"]);
+  });
+
+  it("requires the user, password and from address once a host is set", () => {
+    expect(problemsOf({ ...base, ...smtp, SMTP_PASSWORD: "" })).toEqual([
+      { name: "SMTP_PASSWORD", problem: "missing" },
+    ]);
+    expect(problemsOf({ ...base, SMTP_HOST: "smtp.gmail.com" }).map((p) => p.name)).toEqual([
+      "SMTP_USER",
+      "SMTP_PASSWORD",
+      "MAIL_FROM",
+    ]);
+  });
+
+  it("refuses a bad port or from address without printing the password", () => {
+    const problems = problemsOf({ ...base, ...smtp, SMTP_PORT: "abc", MAIL_FROM: "nope" });
+    expect(problems.map((p) => p.name).sort()).toEqual(["MAIL_FROM", "SMTP_PORT"]);
+    expect(formatProblems(problems)).not.toContain("app-pass-s3cret");
   });
 });

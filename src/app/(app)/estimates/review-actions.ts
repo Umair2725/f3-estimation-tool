@@ -1,7 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 import { getCurrentUser } from "@/server/auth/session";
+import { deliverQueuedSoftly } from "@/server/email/deliver";
 import {
   addComment,
   approve,
@@ -18,6 +20,8 @@ export type ActionResult = { ok: boolean; message?: string };
 async function run(work: () => Promise<unknown>, done: string): Promise<ActionResult> {
   try {
     await work();
+    // Emails queued by the change go out once the response is sent (specs/email-notifications).
+    after(deliverQueuedSoftly);
     refresh();
     return { ok: true, message: done };
   } catch (err) {

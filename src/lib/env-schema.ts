@@ -47,6 +47,26 @@ export const envSchema = z
     // Optional: without a key, AI guesses are off. Never logged or shown.
     ANTHROPIC_API_KEY: optionalText,
     ANTHROPIC_MODEL: optionalText,
+    // Email (specs/email-notifications): off unless SMTP_HOST is set. The password is never logged.
+    SMTP_HOST: optionalText,
+    SMTP_PORT: z.preprocess(
+      (value) => (value === "" || value === undefined ? "465" : value),
+      z.coerce.number().int().min(1).max(65535),
+    ),
+    // Empty = TLS from the start on port 465, STARTTLS otherwise.
+    SMTP_SECURE: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["true", "false"]).optional(),
+    ),
+    SMTP_USER: optionalText,
+    SMTP_PASSWORD: optionalText,
+    MAIL_FROM: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z
+        .string()
+        .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)
+        .optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     const production = env.NODE_ENV === "production";
@@ -61,6 +81,11 @@ export const envSchema = z
     const googleRequired = production || env.AUTH_DEV_LOGIN !== "1";
     if (googleRequired) {
       for (const name of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const) {
+        if (!env[name]) ctx.addIssue({ code: "custom", path: [name], message: "required" });
+      }
+    }
+    if (env.SMTP_HOST) {
+      for (const name of ["SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"] as const) {
         if (!env[name]) ctx.addIssue({ code: "custom", path: [name], message: "required" });
       }
     }

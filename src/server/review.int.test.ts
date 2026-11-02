@@ -190,6 +190,34 @@ describe("review and approval (specs/estimate-review)", () => {
     expect(await getReviewPanel(owner, id)).toMatchObject({ status: "DRAFT", version: 2 });
   });
 
+  it("emails each review update to the right person (specs/email-notifications)", async () => {
+    const owner = await person();
+    const lead = await person("TECH_LEAD");
+    const id = await completeRequest(owner);
+    const emails = () =>
+      getDb().emailMessage.findMany({ where: { requestId: id }, orderBy: { createdAt: "asc" } });
+
+    await submitForReview(owner, id, { reviewerId: lead.id });
+    await requestChanges(lead, id, { comment: "Split the sync Task" });
+    const [submitted, changes] = await emails();
+    expect(submitted).toMatchObject({ kind: "SUBMITTED", to: lead.email, userId: lead.id });
+    expect(submitted.text).toContain(`/estimates/${id}/review`);
+    // Not set up in tests, so the Email page can still show what would have gone out.
+    expect(submitted.status).toBe("NOT_SENT");
+    expect(changes).toMatchObject({ kind: "CHANGES_REQUESTED", to: owner.email });
+    expect(changes.text).toContain("Comment: Split the sync Task");
+
+    // A deactivated owner gets the in-app update but no email.
+    await submitForReview(owner, id, { reviewerId: lead.id });
+    await getDb().user.update({ where: { id: owner.id }, data: { status: "DEACTIVATED" } });
+    await approve(lead, id);
+    expect((await emails()).map((e) => [e.kind, e.to])).toEqual([
+      ["SUBMITTED", lead.email],
+      ["CHANGES_REQUESTED", owner.email],
+      ["SUBMITTED", lead.email],
+    ]);
+  });
+
   it("refuses ineligible Approvers, incomplete requests and Min greater than Max", async () => {
     const owner = await person("TECH_LEAD");
     const estimator = await person("ESTIMATOR");

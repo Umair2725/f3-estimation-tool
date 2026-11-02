@@ -7,8 +7,10 @@ import {
   invite,
   INVITE_DOMAIN_MESSAGE,
   LAST_ADMIN_MESSAGE,
+  NO_PENDING_INVITATION,
   listPeople,
   reactivate,
+  resendInvitation,
   setRole,
 } from "./people";
 
@@ -70,7 +72,7 @@ describe("people service (specs/user-roles)", () => {
   it("gives an invited person the role on first sign-in", async () => {
     const { actor } = await person({ role: "ADMIN" });
     const email = `pinvite.${Date.now()}@folio3.com`;
-    expect(await invite(actor, ` ${email.toUpperCase()} `, "TECH_LEAD")).toBe("invited");
+    expect((await invite(actor, ` ${email.toUpperCase()} `, "TECH_LEAD")).outcome).toBe("invited");
     const { user } = await person({ email, role: null });
     expect((await signIn(email)).response.status).toBe(200);
     const after = await getDb().user.findUniqueOrThrow({ where: { id: user.id } });
@@ -80,10 +82,59 @@ describe("people service (specs/user-roles)", () => {
   it("changes the role directly when the invited person already exists", async () => {
     const { actor } = await person({ role: "ADMIN" });
     const { user } = await person({ role: null });
-    expect(await invite(actor, user.email, "ARCHITECT")).toBe("updated");
+    expect(await invite(actor, user.email, "ARCHITECT")).toEqual({
+      outcome: "updated",
+      emailId: null,
+    });
     expect((await getDb().user.findUniqueOrThrow({ where: { id: user.id } })).role).toBe(
       "ARCHITECT",
     );
+  });
+
+  it("emails invitations, resends, and tells a waiting person they have access", async () => {
+    const { actor } = await person({ role: "ADMIN" });
+    const email = `pinvite.mail.${Date.now()}@folio3.com`;
+    const { emailId } = await invite(actor, email, "TECH_LEAD");
+    const invitation = await getDb().emailMessage.findUniqueOrThrow({ where: { id: emailId! } });
+    expect(invitation).toMatchObject({
+      kind: "INVITATION",
+      to: email,
+      subject: `${actor.name} invited you to the F3 Estimation Tool as Tech Lead`,
+    });
+    expect(invitation.text).toContain("/sign-in");
+
+    const again = await resendInvitation(actor, email.toUpperCase());
+    expect(again).not.toBe(emailId);
+    expect(await getDb().emailMessage.count({ where: { to: email, kind: "INVITATION" } })).toBe(2);
+    await expect(resendInvitation(actor, "pinvite.none@folio3.com")).rejects.toThrow(
+      NO_PENDING_INVITATION,
+    );
+    const { actor: lead } = await person({ role: "TECH_LEAD" });
+    await expect(resendInvitation(lead, email)).rejects.toMatchObject({ status: 403 });
+
+    // First role: access granted, also when it comes through an invitation. A change: nothing.
+    const { user: waiting } = await person({ role: null });
+    const { user: waiting2 } = await person({ role: null });
+    await setRole(actor, waiting.id, "ESTIMATOR");
+    await invite(actor, waiting2.email, "ARCHITECT");
+    await setRole(actor, waiting.id, "TECH_LEAD");
+    const access = await getDb().emailMessage.findMany({
+      where: { userId: { in: [waiting.id, waiting2.id] } },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(access.map((e) => [e.kind, e.to, e.subject])).toEqual([
+      [
+        "ACCESS_GRANTED",
+        waiting.email,
+        "You now have access to the F3 Estimation Tool as Estimator",
+      ],
+      [
+        "ACCESS_GRANTED",
+        waiting2.email,
+        "You now have access to the F3 Estimation Tool as Architect",
+      ],
+    ]);
+    await getDb().emailMessage.deleteMany({ where: { to: { startsWith: "pinvite." } } });
   });
 
   it("deactivation ends sessions and blocks sign-in; reactivation restores the role", async () => {

@@ -6,6 +6,7 @@ import {
   deactivateAction,
   inviteAction,
   reactivateAction,
+  resendInvitationAction,
   revokeInvitationAction,
   setRoleAction,
   type ActionResult,
@@ -296,6 +297,15 @@ function InviteSection(props: { invitations: Invitation[]; pending: boolean; per
               <li key={inv.email} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span className="break-all">{inv.email}</span>
                 <span className="text-muted">{ROLE_LABELS[inv.role]}</span>
+                <button
+                  type="button"
+                  className={smallButton}
+                  disabled={props.pending}
+                  aria-label={`Resend invitation email to ${inv.email}`}
+                  onClick={() => props.perform(() => resendInvitationAction(inv.email))}
+                >
+                  Resend
+                </button>
                 <button
                   type="button"
                   className={smallButton}

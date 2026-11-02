@@ -94,6 +94,9 @@ npm.cmd run check-env
 | `ADMIN_EMAILS` | no | – | Comma-separated `@folio3.com` emails that become Admin on first sign-in |
 | `AUTH_DEV_LOGIN` | no | `0` | `1` turns on development sign-in. **Refused when `NODE_ENV=production`** |
 | `DEV_USER_PASSWORD` | no | example value | Password of the seeded development users |
+| `SMTP_HOST` | no | – | Mail server. Empty = no email is sent (see [Email](#email)) |
+| `SMTP_PORT`, `SMTP_SECURE` | no | `465`, TLS on 465 | Port, and `true` for TLS from the start or `false` for STARTTLS |
+| `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | when `SMTP_HOST` is set | – | Mail account, its (app) password, and the sender address |
 
 ## Sign-in and roles
 
@@ -132,6 +135,36 @@ With `AUTH_DEV_LOGIN=1` (the `.env.example` default) the sign-in page also shows
 | `dev.newcomer@folio3.com` | none (shows the waiting page) |
 
 Running the seed again resets these users to the roles above. The seed and the development sign-in both refuse to run in production. The seed also creates three sample estimation requests with fictional clients (Northwind Clinics, Contoso Logistics, Fabrikam Energy), two of them with sample hours ("Field service app" is won, with actual hours), reset to the same state on every run.
+
+## Email
+
+Invitations, "you now have access" and the six review and reference-hours updates are emailed as well as shown in the app. Each email links to the page the update opens. Emails never contain hours, rates or totals.
+
+- Emails are saved with the action and sent right after it, so an action that fails sends nothing.
+- A failed email never stops the action. It's retried on the next action, up to 3 attempts, and an Admin can retry it.
+- With no `SMTP_HOST`, nothing is sent. Emails are listed as "Not sent" so you can see what would have gone out.
+- Tests never send real email: integration and e2e runs switch email off even when `.env` has SMTP settings.
+
+### Send through Gmail (one-time)
+
+1. Use the Gmail or Google Workspace account the emails should come from. A shared mailbox such as `estimation@folio3.com` is best.
+2. Turn on **2-Step Verification** for that account (Google account → Security).
+3. Create an **app password**: Google account → Security → 2-Step Verification → **App passwords**, name it "F3 Estimation Tool" and copy the 16-character password. If the option is missing, your Workspace admin has turned app passwords off; ask IT.
+4. Add these to `.env`, then restart the app. Never paste the password into chat, tickets or git.
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   SMTP_USER=estimation@folio3.com
+   SMTP_PASSWORD=the-app-password
+   MAIL_FROM=estimation@folio3.com
+   ```
+5. Open **Settings → Email** as an Admin and click **Send test email**.
+
+Gmail sends up to about 500 emails a day from a personal account and 2,000 from Workspace, far more than the tool needs. Another mail service (the Workspace relay, Amazon SES) only needs different settings.
+
+### Settings → Email (Admins)
+
+Shows whether email is set up (never the password), **Send test email**, and the latest 50 emails with their status: Sent, Failed with the reason (and **Retry**), or Not sent. **Settings → People and roles** has **Resend** next to each pending invitation.
 
 ## Estimation requests
 

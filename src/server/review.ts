@@ -196,6 +196,7 @@ export async function requestChanges(
       requestId: id,
       kind: "CHANGES_REQUESTED",
       actorId: actor.id,
+      detail: comment,
     });
   });
 }

@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings/tech-stack", label: "Tech stack" },
   { href: "/settings/estimate-defaults", label: "Estimate defaults" },
   { href: "/settings/import", label: "Import past projects" },
+  { href: "/settings/email", label: "Email" },
 ];
 
 export function SettingsTabs() {

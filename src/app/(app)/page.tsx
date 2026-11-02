@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ui } from "@/components/ui";
 import { filtersToSearch, hasActiveFilters, parseFilters } from "@/lib/estimation/filters";
 import { PART_LABELS, STEPS } from "@/lib/estimation/options";
+import { updateLink, updateText } from "@/lib/notifications/texts";
 import { lastActiveLabel } from "@/lib/relative-time";
 import { requireRole } from "@/server/auth/session";
 import { listFilterOptions, listRequests, myDrafts } from "@/server/estimation-requests";
@@ -257,29 +258,4 @@ function greeting(now: Date): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-}
-
-/** Notifications on Home (specs/estimate-review, specs/feature-matching). */
-function updateText(n: { kind: string; projectName: string; actorName: string }): string {
-  switch (n.kind) {
-    case "SUBMITTED":
-      return `${n.actorName} submitted ${n.projectName} for your review`;
-    case "CHANGES_REQUESTED":
-      return `Changes requested on ${n.projectName} by ${n.actorName}`;
-    case "REFERENCE_REQUESTED":
-      return `${n.actorName} asked you for reference hours on ${n.projectName}`;
-    case "REFERENCE_ADDED":
-      return `${n.actorName} added reference hours for ${n.projectName}`;
-    case "REFERENCE_DECLINED":
-      return `${n.actorName} declined a request for reference hours on ${n.projectName}`;
-    default:
-      return `${n.projectName} approved by ${n.actorName}`;
-  }
-}
-
-function updateLink(n: { kind: string; requestId: string }): string {
-  if (n.kind === "SUBMITTED") return `/estimates/${n.requestId}/review`;
-  if (n.kind === "REFERENCE_REQUESTED") return "/reviews";
-  if (n.kind.startsWith("REFERENCE_")) return `/estimates/${n.requestId}/estimate`;
-  return `/estimates/${n.requestId}`;
 }

@@ -42,6 +42,9 @@ export default defineConfig({
       AUTH_DEV_LOGIN: "1",
       ENABLE_TEST_ROUTES: "1",
       EMBEDDINGS_PROVIDER: "stub",
+      // Never real email or AI calls from e2e runs, even with these set in .env.
+      SMTP_HOST: "",
+      ANTHROPIC_API_KEY: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },
