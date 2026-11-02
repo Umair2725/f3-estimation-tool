@@ -417,6 +417,15 @@ describe("Architect references", () => {
     expect(
       (await getDb().notification.findMany({ where: { userId: owner.id } })).map((n) => n.kind),
     ).toContain("REFERENCE_ADDED");
+    expect(
+      (await getDb().emailMessage.findMany({ where: { requestId: id } })).map((e) => [
+        e.kind,
+        e.to,
+      ]),
+    ).toEqual([
+      ["REFERENCE_REQUESTED", architect.email],
+      ["REFERENCE_ADDED", owner.email],
+    ]);
 
     // A later request with a similar feature gets it as a match.
     const later = await request(owner, [{ name }]);
@@ -447,6 +456,19 @@ describe("Architect references", () => {
     });
     // Asking again is allowed after a decline.
     await askArchitect(owner, id, task.taskId, { architectId: architect.id });
+
+    // Each update is also emailed (specs/email-notifications).
+    const emails = await getDb().emailMessage.findMany({
+      where: { requestId: id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(emails.map((e) => [e.kind, e.to])).toEqual([
+      ["REFERENCE_REQUESTED", architect.email],
+      ["REFERENCE_DECLINED", owner.email],
+      ["REFERENCE_REQUESTED", architect.email],
+    ]);
+    expect(emails[1].text).toContain("Reason: Too vague");
+    expect(emails[1].text).toContain(`/estimates/${id}/estimate`);
   });
 });
 

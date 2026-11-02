@@ -16,6 +16,8 @@ Object.assign(process.env, {
   // No model download and no AI calls in tests (specs/feature-matching).
   EMBEDDINGS_PROVIDER: "stub",
   ANTHROPIC_API_KEY: "",
+  // Never real email from tests: they swap in a fake transport (specs/email-notifications).
+  SMTP_HOST: "",
 });
 
 if (!process.env.DATABASE_URL) {

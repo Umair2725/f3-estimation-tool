@@ -36,6 +36,7 @@
     "exceljs": "4.4.0",
     "jszip": "3.10.2",
     "next": "16.4.3",
+    "nodemailer": "10.1.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",

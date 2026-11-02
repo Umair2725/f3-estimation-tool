@@ -1,7 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 import { getCurrentUser } from "@/server/auth/session";
+import { deliverQueuedSoftly } from "@/server/email/deliver";
 import { answerReference, declineReference } from "@/server/matching/matching";
 import { ServiceError } from "@/server/service-error";
 
@@ -9,6 +11,8 @@ import { ServiceError } from "@/server/service-error";
 async function run(work: () => Promise<unknown>, done: string) {
   try {
     await work();
+    // Emails queued by the change go out once the response is sent (specs/email-notifications).
+    after(deliverQueuedSoftly);
     refresh();
     return { ok: true, message: done };
   } catch (err) {

@@ -568,6 +568,7 @@ export async function declineReference(
       requestId: r.requestId,
       kind: "REFERENCE_DECLINED",
       actorId: actor.id,
+      detail: reason,
     });
   });
 }
