@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { authFile } from "./helpers";
 
 // specs/feature-matching, with stub embeddings and no AI key (see playwright.config.ts).
-// Serial: one request goes from matches to an Architect reference. Run as the Admin, so the
+// Serial: one request goes from matches to an Architect reference (stored as a Draft benchmark). Run as the Admin, so the
 // Estimator's drafts (checked by other specs in parallel) are left alone.
 test.describe.configure({ mode: "serial" });
 
@@ -91,7 +91,7 @@ test("the Architect adds reference hours", async ({ browser }) => {
   await page.getByLabel("Min hours for Core service").fill("16");
   await page.getByLabel("Max hours for Core service").fill("24");
   await page.getByRole("button", { name: "Save reference hours" }).click();
-  await expect(page.getByText("They're now used for matching.").first()).toBeVisible();
+  await expect(page.getByText("now a Draft benchmark used for matching").first()).toBeVisible();
 });
 
 test("the Admin sees the update and the reference as the suggestion", async ({ browser }) => {
@@ -101,10 +101,13 @@ test("the Admin sees the update and the reference as the suggestion", async ({ b
     .getByRole("link", { name: `Dev Architect added reference hours for ${name}` })
     .click();
   const task = page.getByRole("region", { name: `Task ${unknown}` });
-  await expect(task.getByTestId("suggestion-line")).toContainText("Architect reference");
+  // Reference hours are stored as a Draft benchmark (specs/feature-matching).
+  await expect(task.getByTestId("suggestion-line")).toContainText(
+    "Draft benchmark, not confirmed yet",
+  );
   await expect(task.getByTestId("suggestion-line")).toContainText("16–24 h");
   await task.getByRole("button", { name: "Accept" }).click();
   await expect(task.getByLabel(`Comment for Core service`)).toHaveValue(
-    "From Architect reference by Dev Architect",
+    /^From benchmark FB-9\d{3}$/,
   );
 });

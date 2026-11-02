@@ -65,6 +65,8 @@ test("a Tech Lead enters actual hours and sees the report", async ({ browser }) 
   const page = await as(browser, "techlead");
   await page.goto(`${requestUrl}/actuals`);
   await page.getByLabel("Actual hours for Booking API").fill("38");
+  // AI-era project: who did the work (specs/actual-hours "Team level feeds benchmarks").
+  await page.getByLabel("Team level").selectOption("EXPERIENCED");
   await page.getByRole("button", { name: "Save as a new version" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved as version 1" })).toBeVisible();
   const report = page.getByTestId("accuracy-report");
@@ -80,6 +82,8 @@ test("a Tech Lead enters actual hours and sees the report", async ({ browser }) 
 test("a Tech Lead uploads the edited export, confirms a renamed row and saves version 2", async ({
   browser,
 }) => {
+  // Export, edit, upload and parse: slow under a busy parallel run.
+  test.slow();
   // Export as the owner and edit it like a PM would.
   const owner = await as(browser, "estimator");
   await owner.goto(`${requestUrl}/estimate`);
@@ -112,6 +116,8 @@ test("a Tech Lead uploads the edited export, confirms a renamed row and saves ve
   await expect(page.getByTestId("match-counts")).toContainText("1 to confirm");
   await expect(page.getByRole("button", { name: "Save as a new version" })).toBeDisabled();
   await page.getByRole("button", { name: "Confirm match for User login" }).click();
+  await expect(page.getByRole("button", { name: "Save as a new version" })).toBeDisabled();
+  await page.getByLabel("Team level").selectOption("JUNIOR");
   await page.getByRole("button", { name: "Save as a new version" }).click();
   await expect(page).toHaveURL(new RegExp(`${requestUrl}/actuals$`));
   await expect(page.getByTestId("versions")).toContainText("Version 2");

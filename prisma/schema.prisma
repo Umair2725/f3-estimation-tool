@@ -41,16 +41,19 @@ model User {
   sessions        Session[]
   accounts        Account[]
   invitations     RoleInvitation[]
-  requests        EstimationRequest[] @relation("requestOwner")
-  reviewing       EstimationRequest[] @relation("requestReviewer")
+  requests        EstimationRequest[]    @relation("requestOwner")
+  reviewing       EstimationRequest[]    @relation("requestReviewer")
   statusChanges   StatusChange[]
   reviewComments  ReviewComment[]
   approvals       ApprovedVersion[]
-  notifications   Notification[]      @relation("notificationUser")
-  notified        Notification[]      @relation("notificationActor")
-  referencesAsked ReferenceRequest[]  @relation("referenceAsker")
-  referencesToDo  ReferenceRequest[]  @relation("referenceArchitect")
-  references      FeatureReference[]
+  notifications   Notification[]         @relation("notificationUser")
+  notified        Notification[]         @relation("notificationActor")
+  referencesAsked ReferenceRequest[]     @relation("referenceAsker")
+  referencesToDo  ReferenceRequest[]     @relation("referenceArchitect")
+  benchmarksMade  FeatureBenchmark[]     @relation("benchmarkCreator")
+  benchmarksOk    FeatureBenchmark[]     @relation("benchmarkConfirmer")
+  observations    BenchmarkObservation[]
+  benchmarkLog    BenchmarkChange[]
   suggestionCalls TaskSuggestion[]
   exports         ExportRecord[]
   actuals         ActualsVersion[]
@@ -212,7 +215,7 @@ model EstimationRequest {
   notifications  Notification[]
   knowledge      KnowledgeItem[]
   referenceAsks  ReferenceRequest[]
-  references     FeatureReference[]
+  observations   BenchmarkObservation[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([reviewerId, status])
@@ -299,20 +302,23 @@ model EstimateTask {
 }
 
 model SubTask {
-  id           String          @id @default(uuid())
-  taskId       String          @map("task_id")
-  task         EstimateTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id           String            @id @default(uuid())
+  taskId       String            @map("task_id")
+  task         EstimateTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   title        String
-  minTenths    Int             @map("min_tenths") // hours × 10, exact
-  maxTenths    Int             @map("max_tenths")
-  comment      String          @default("")
+  minTenths    Int               @map("min_tenths") // hours × 10, exact
+  maxTenths    Int               @map("max_tenths")
+  comment      String            @default("")
   position     Int
   actuals      ActualHours[]
   // Where an imported Sub task came from (specs/historical-import).
-  sourceFileId String?         @map("source_file_id")
-  sourceFile   UploadedFile?   @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
-  sourceSheet  String?         @map("source_sheet")
-  sourceRow    Int?            @map("source_row")
+  sourceFileId String?           @map("source_file_id")
+  sourceFile   UploadedFile?     @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  sourceSheet  String?           @map("source_sheet")
+  sourceRow    Int?              @map("source_row")
+  // The benchmark a Sub task was taken from (specs/feature-matching), so actuals can feed it.
+  benchmarkId  String?           @map("benchmark_id")
+  benchmark    FeatureBenchmark? @relation(fields: [benchmarkId], references: [id], onDelete: SetNull)
   comments     ReviewComment[]
 
   @@index([taskId, position])
@@ -374,18 +380,21 @@ enum ActualStatus {
 
 // One saved set of actual hours; the highest number is the request's current actuals.
 model ActualsVersion {
-  id          String            @id @default(uuid())
-  requestId   String            @map("request_id")
-  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  number      Int
-  source      ActualsSource
-  fileName    String?           @map("file_name")
-  fileBytes   Bytes?            @map("file_bytes")
-  fingerprint String?
-  createdById String            @map("created_by_id")
-  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt   DateTime          @default(now()) @map("created_at")
-  rows        ActualHours[]
+  id           String                 @id @default(uuid())
+  requestId    String                 @map("request_id")
+  request      EstimationRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  number       Int
+  source       ActualsSource
+  fileName     String?                @map("file_name")
+  fileBytes    Bytes?                 @map("file_bytes")
+  fingerprint  String?
+  createdById  String                 @map("created_by_id")
+  createdBy    User                   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt    DateTime               @default(now()) @map("created_at")
+  rows         ActualHours[]
+  // Who did the work, for benchmark observations (specs/actual-hours); AI-era requests only.
+  teamLevel    DeveloperLevel?        @map("team_level")
+  observations BenchmarkObservation[]
 
   @@unique([requestId, number])
   @@map("actuals_version")
@@ -601,19 +610,21 @@ model Notification {
 enum KnowledgeKind {
   APPROVED_PRE_AI
   APPROVED_AI_ERA
-  ARCHITECT_REFERENCE
+  BENCHMARK_CONFIRMED
+  BENCHMARK_DRAFT
 }
 
-// One Task of a latest approved version, or one Architect reference, with its embedding.
+// One Task of a latest approved version, or one usable benchmark, with its embedding.
 model KnowledgeItem {
   id           String                     @id @default(uuid())
   kind         KnowledgeKind
   requestId    String?                    @map("request_id")
   request      EstimationRequest?         @relation(fields: [requestId], references: [id], onDelete: Cascade)
   version      Int?
-  referenceId  String?                    @map("reference_id")
-  reference    FeatureReference?          @relation(fields: [referenceId], references: [id], onDelete: Cascade)
-  part         ProjectPart
+  benchmarkId  String?                    @map("benchmark_id")
+  benchmark    FeatureBenchmark?          @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  // Null for a benchmark whose part is Any: it matches every part.
+  part         ProjectPart?
   partLabel    String                     @map("part_label")
   title        String
   subTasks     Json                       @map("sub_tasks") // [{ title, minTenths, maxTenths, actualTenths? }]
@@ -633,25 +644,6 @@ model KnowledgeItem {
   @@index([model, part])
   @@index([requestId])
   @@map("knowledge_item")
-}
-
-// Reference hours an Architect added for a feature that had no reliable match.
-model FeatureReference {
-  id          String             @id @default(uuid())
-  title       String
-  description String             @default("")
-  part        ProjectPart
-  stack       String[]
-  subTasks    Json               @map("sub_tasks") // [{ title, minTenths, maxTenths }]
-  authorId    String             @map("author_id")
-  author      User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  requestId   String?            @map("request_id")
-  request     EstimationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
-  createdAt   DateTime           @default(now()) @map("created_at")
-  knowledge   KnowledgeItem[]
-  answers     ReferenceRequest[]
-
-  @@map("feature_reference")
 }
 
 enum ReferenceRequestStatus {
@@ -678,8 +670,9 @@ model ReferenceRequest {
   architect          User                   @relation("referenceArchitect", fields: [architectId], references: [id], onDelete: Restrict)
   status             ReferenceRequestStatus @default(OPEN)
   declineReason      String?                @map("decline_reason")
-  referenceId        String?                @map("reference_id")
-  reference          FeatureReference?      @relation(fields: [referenceId], references: [id], onDelete: SetNull)
+  // The Draft benchmark the Architect's answer became (specs/feature-matching).
+  benchmarkId        String?                @map("benchmark_id")
+  benchmark          FeatureBenchmark?      @relation(fields: [benchmarkId], references: [id], onDelete: SetNull)
   createdAt          DateTime               @default(now()) @map("created_at")
   answeredAt         DateTime?              @map("answered_at")
 
@@ -689,7 +682,8 @@ model ReferenceRequest {
 }
 
 enum SuggestionMethod {
-  ARCHITECT_REFERENCE
+  BENCHMARK_CONFIRMED
+  BENCHMARK_DRAFT
   AI_ERA_ACTUALS
   AI_ERA_ESTIMATE
   PRE_AI_MATCH
@@ -722,4 +716,126 @@ model TaskSuggestion {
   createdAt          DateTime           @default(now()) @map("created_at")
 
   @@map("task_suggestion")
+}
+
+// ---------- Feature benchmarks (specs/feature-benchmarks) ----------
+
+enum BenchmarkPart {
+  WEB_FRONTEND
+  BACKEND
+  ADMIN_PANEL
+  MOBILE
+  CLOUD_INFRA
+  DESIGN
+  ANY
+}
+
+enum BenchmarkStatus {
+  DRAFT
+  CONFIRMED
+  RETIRED
+}
+
+enum DeveloperLevel {
+  EXPERIENCED
+  JUNIOR
+  MIXED
+}
+
+enum ObservationSource {
+  MANUAL
+  SURVEY
+  ACTUALS
+}
+
+enum BenchmarkChangeKind {
+  IMPORT
+  EDIT
+  RECALCULATED
+  PROPOSED
+  PROPOSAL_ACCEPTED
+  PROPOSAL_REJECTED
+  CONFIRMED
+  RETIRED
+  REFERENCE
+}
+
+model FeatureBenchmark {
+  id                String          @id @default(uuid())
+  code              String          @unique // "FB-012"
+  module            String          @default("")
+  feature           String
+  part              BenchmarkPart
+  stack             String          @default("Any")
+  included          String          @default("")
+  preAiMinTenths    Int?            @map("pre_ai_min_tenths")
+  preAiMaxTenths    Int?            @map("pre_ai_max_tenths")
+  preAiSource       String?         @map("pre_ai_source")
+  experiencedTenths Int?            @map("experienced_tenths") // -> Min
+  juniorTenths      Int?            @map("junior_tenths") // -> Max
+  aiTools           String          @default("") @map("ai_tools")
+  projectsCount     Int             @default(0) @map("projects_count")
+  status            BenchmarkStatus @default(DRAFT)
+  confirmedById     String?         @map("confirmed_by_id")
+  confirmedBy       User?           @relation("benchmarkConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+  confirmedAt       DateTime?       @map("confirmed_at")
+  notes             String          @default("")
+  // Sub tasks from an Architect's reference hours: [{ title, minTenths, maxTenths }].
+  breakdown         Json?
+  createdById       String?         @map("created_by_id")
+  createdBy         User?           @relation("benchmarkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  observations BenchmarkObservation[]
+  changes      BenchmarkChange[]
+  knowledge    KnowledgeItem[]
+  subTasks     SubTask[]
+  answers      ReferenceRequest[]
+
+  @@index([part, status])
+  @@index([feature(ops: raw("gin_trgm_ops"))], type: Gin, map: "feature_benchmark_feature_trgm_idx")
+  @@map("feature_benchmark")
+}
+
+model BenchmarkObservation {
+  id               String             @id @default(uuid())
+  benchmarkId      String             @map("benchmark_id")
+  benchmark        FeatureBenchmark   @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  level            DeveloperLevel
+  hoursTenths      Int                @map("hours_tenths")
+  observedOn       DateTime           @map("observed_on") @db.Date
+  source           ObservationSource
+  aiTools          String             @default("") @map("ai_tools")
+  note             String             @default("")
+  requestId        String?            @map("request_id")
+  request          EstimationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  actualsVersionId String?            @map("actuals_version_id")
+  actualsVersion   ActualsVersion?    @relation(fields: [actualsVersionId], references: [id], onDelete: Cascade)
+  createdById      String?            @map("created_by_id")
+  createdBy        User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  @@index([benchmarkId, level])
+  @@map("benchmark_observation")
+}
+
+// The change log; a PROPOSED row with no later decision is a pending proposal.
+model BenchmarkChange {
+  id              String              @id @default(uuid())
+  benchmarkId     String              @map("benchmark_id")
+  benchmark       FeatureBenchmark    @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  kind            BenchmarkChangeKind
+  fromExperienced Int?                @map("from_experienced")
+  fromJunior      Int?                @map("from_junior")
+  toExperienced   Int?                @map("to_experienced")
+  toJunior        Int?                @map("to_junior")
+  observationIds  String[]            @map("observation_ids")
+  note            String              @default("")
+  actorId         String?             @map("actor_id")
+  actor           User?               @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([benchmarkId, createdAt])
+  @@map("benchmark_change")
 }

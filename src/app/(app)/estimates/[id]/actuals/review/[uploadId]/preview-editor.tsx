@@ -9,6 +9,7 @@ import { hoursSchema } from "@/lib/estimation/schemas";
 import { formatHours } from "@/lib/estimation/totals";
 import type { UploadPreview } from "@/server/actuals";
 import { discardUploadAction, saveUploadAction } from "../../actions";
+import { TeamLevelSelect, type TeamLevelChoice } from "../../team-level";
 
 // Preview of an uploaded actuals file (specs/actual-hours "Preview before saving"). The same
 // pure matcher runs here for instant feedback and again on the server when saving.
@@ -26,6 +27,7 @@ export function PreviewEditor(props: {
 }) {
   const router = useRouter();
   const { preview } = props;
+  const [teamLevel, setTeamLevel] = useState<TeamLevelChoice>("");
   const [sheetParts, setSheetParts] = useState<Record<string, string>>({});
   const [rejected, setRejected] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState<string[]>([]);
@@ -57,11 +59,20 @@ export function PreviewEditor(props: {
   const badHours = Object.values(hours).some(
     (v) => v.trim() !== "" && !hoursSchema.safeParse(Number(v)).success,
   );
-  const canSave = unresolved.length === 0 && unassigned.length === 0 && !badHours;
+  const canSave =
+    unresolved.length === 0 &&
+    unassigned.length === 0 &&
+    !badHours &&
+    (!preview.aiEra || teamLevel !== "");
 
   function save() {
     startTransition(async () => {
-      const r = await saveUploadAction(props.requestId, props.uploadId, decisions);
+      const r = await saveUploadAction(
+        props.requestId,
+        props.uploadId,
+        decisions,
+        teamLevel || null,
+      );
       if (r.ok) router.push(`/estimates/${props.requestId}/actuals`);
       else setMessage(r.message);
     });
@@ -244,6 +255,7 @@ export function PreviewEditor(props: {
       )}
 
       <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4">
+        {preview.aiEra && <TeamLevelSelect value={teamLevel} onChange={setTeamLevel} />}
         <button
           type="button"
           className={ui.primaryButton}

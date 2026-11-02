@@ -7,6 +7,7 @@ import { createUser, deleteUsers } from "../../../test/factories";
 import { getEstimate, saveEstimate, type EstimateView } from "../estimates";
 import { createRequest, saveStep } from "../estimation-requests";
 import { approve, getReview, reopen, submitForReview } from "../review";
+import { confirmBenchmark, createBenchmark, retireBenchmark } from "../benchmarks/benchmarks";
 import { setGuessClientForTests } from "./ai-guess";
 import { stubEmbedder } from "./embedder";
 import { indexRequest } from "./knowledge";
@@ -33,7 +34,7 @@ beforeAll(async () => {
 afterEach(() => setGuessClientForTests(undefined));
 afterAll(async () => {
   const db = getDb();
-  await db.featureReference.deleteMany({ where: { authorId: { in: users } } });
+  await db.featureBenchmark.deleteMany({ where: { createdById: { in: users } } });
   await db.estimationRequest.deleteMany({ where: { ownerId: { in: users } } });
   await db.client.deleteMany({ where: { name: { contains: tag } } });
   await deleteUsers(users);
@@ -264,6 +265,75 @@ describe("find matches and decide", () => {
   });
 });
 
+describe("benchmarks in matching (specs/feature-matching)", () => {
+  it("offers a Confirmed benchmark first, matches Any parts, never Design, and drops retired ones", async () => {
+    const owner = await person();
+    const lead = await person("TECH_LEAD");
+    const architect = await person("ARCHITECT");
+    const name = `${word("Glacier")} onboarding`;
+    // A pre-AI source above the threshold too: the benchmark must still come first.
+    const preAi = await request(owner, [
+      { name, subTasks: [{ title: "Old way", min: 30, max: 40 }] },
+    ]);
+    await getDb().estimationRequest.update({ where: { id: preAi }, data: { baseline: "PRE_AI" } });
+    await approved(owner, lead, preAi);
+    const b = await createBenchmark(lead, {
+      feature: name,
+      part: "BACKEND",
+      stack: "Node.js",
+      experienced: 3,
+      junior: 5,
+    });
+    await confirmBenchmark(lead, b.id);
+
+    const target = await request(owner, [{ name }]);
+    await findMatches(owner, target);
+    const task = await taskOf(owner, target, name);
+    const s1 = (await getMatching(owner, target)).byTask[task.taskId].suggestion!;
+    expect(s1).toMatchObject({ method: "BENCHMARK_CONFIRMED", minTenths: 30, maxTenths: 50 });
+    expect(s1.matches.find((m) => m.benchmark?.id === b.id)?.benchmark).toMatchObject({
+      code: b.code,
+      status: "CONFIRMED",
+      confirmedByName: lead.name,
+    });
+    await decideSuggestion(owner, target, task.taskId, { decision: "ACCEPTED" });
+    const subs = await getDb().subTask.findMany({ where: { taskId: task.taskId } });
+    expect(subs.map((x) => [x.title, x.benchmarkId, x.comment])).toEqual([
+      [name, b.id, `From benchmark ${b.code}`],
+    ]);
+
+    // Retired: gone from matching; the pre-AI source is next.
+    await retireBenchmark(architect, b.id);
+    await findMatches(owner, target, task.taskId);
+    expect((await getMatching(owner, target)).byTask[task.taskId].suggestion!.method).toBe(
+      "PRE_AI_MATCH",
+    );
+
+    // Any part matches a Mobile-free Backend Task; Design never matches.
+    const anyName = `${word("Harbor")} audit trail`;
+    const any = await createBenchmark(lead, { feature: anyName, part: "ANY", experienced: 2 });
+    const design = await createBenchmark(lead, {
+      feature: `${word("Meadow")} style guide`,
+      part: "DESIGN",
+      experienced: 2,
+    });
+    const other = await request(owner, [
+      { name: anyName },
+      { name: `${word("Meadow")} style guide` },
+    ]);
+    await findMatches(owner, other);
+    const view = await getMatching(owner, other);
+    const anyTask = await taskOf(owner, other, anyName);
+    expect(view.byTask[anyTask.taskId].suggestion).toMatchObject({ method: "BENCHMARK_DRAFT" });
+    expect(
+      Object.values(view.byTask).some((t) =>
+        t.suggestion?.matches.some((m) => m.benchmark?.id === design.id),
+      ),
+    ).toBe(false);
+    void any;
+  });
+});
+
 describe("Architect references", () => {
   it("asks an Architect, who adds reference hours used now and by later requests", async () => {
     const owner = await person();
@@ -313,16 +383,37 @@ describe("Architect references", () => {
     await expect(answerReference(lead, ask.id, input)).rejects.toMatchObject({ status: 403 });
     await answerReference(architect, ask.id, input);
 
+    // Stored as a Draft benchmark with the Sub tasks as its breakdown.
+    const answered = await getDb().referenceRequest.findUniqueOrThrow({
+      where: { id: ask.id },
+      include: { benchmark: true },
+    });
+    expect(answered.benchmark).toMatchObject({
+      status: "DRAFT",
+      feature: name,
+      part: "BACKEND",
+      stack: "Node.js",
+      experiencedTenths: 160,
+      juniorTenths: 240,
+    });
+    expect(Number(answered.benchmark!.code.slice(3))).toBeGreaterThanOrEqual(9001);
+
     const now = (await getMatching(owner, id)).byTask[task.taskId];
     expect(now.ask!.status).toBe("ANSWERED");
     expect(now.suggestion).toMatchObject({
-      method: "ARCHITECT_REFERENCE",
+      method: "BENCHMARK_DRAFT",
       minTenths: 160,
       maxTenths: 240,
     });
-    expect(now.suggestion!.suggested![0].comment).toBe(
-      `From Architect reference by ${architect.name}`,
-    );
+    expect(now.suggestion!.suggested![0]).toMatchObject({
+      title: "Bank feed import",
+      comment: `From benchmark ${answered.benchmark!.code}`,
+      benchmarkId: answered.benchmarkId,
+    });
+    // Accepting keeps the link, so actual hours can flow back.
+    await decideSuggestion(owner, id, task.taskId, { decision: "ACCEPTED" });
+    const linked = await getDb().subTask.findMany({ where: { taskId: task.taskId } });
+    expect(linked.map((l) => l.benchmarkId)).toEqual([answered.benchmarkId, answered.benchmarkId]);
     expect(
       (await getDb().notification.findMany({ where: { userId: owner.id } })).map((n) => n.kind),
     ).toContain("REFERENCE_ADDED");
@@ -332,7 +423,7 @@ describe("Architect references", () => {
     await findMatches(owner, later);
     const laterTask = await taskOf(owner, later, name);
     expect((await getMatching(owner, later)).byTask[laterTask.taskId].suggestion!.method).toBe(
-      "ARCHITECT_REFERENCE",
+      "BENCHMARK_DRAFT",
     );
     await expect(answerReference(architect, ask.id, input)).rejects.toMatchObject({ status: 409 });
     void lead;

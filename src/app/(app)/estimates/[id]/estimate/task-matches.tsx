@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { ui } from "@/components/ui";
 import { formatHours } from "@/lib/estimation/totals";
+import { benchmarkSource } from "@/lib/benchmarks/labels";
 import { METHOD_LABELS, sourceName, type Match } from "@/lib/matching/suggest";
 import type { MatchingView } from "@/server/matching/matching";
 import {
@@ -76,7 +77,12 @@ export function TaskMatches(props: {
                 ` · ${range(suggestion.minTenths, suggestion.maxTenths)}`}
               {suggestion.method !== "NO_MATCH" &&
                 suggestion.method !== "AI_GUESS" &&
-                suggestion.matches[0] && <> · {sourceName(sourceOf(suggestion))}</>}
+                suggestion.matches[0] && (
+                  <>
+                    {" "}
+                    · <SourceLink match={sourceOf(suggestion)} long />
+                  </>
+                )}
               {suggestion.decision !== "PENDING" && (
                 <span className="text-muted">
                   {" "}
@@ -122,13 +128,7 @@ export function TaskMatches(props: {
                   <tr key={m.id} className="border-t border-border">
                     <td className="py-1 tabular-nums">{Math.round(m.similarity * 100)}%</td>
                     <td className="py-1">
-                      {m.requestId ? (
-                        <Link className="underline" href={`/estimates/${m.requestId}`}>
-                          {sourceName(m)}
-                        </Link>
-                      ) : (
-                        sourceName(m)
-                      )}
+                      <SourceLink match={m} />
                       {m.clientName && <span className="text-muted"> · {m.clientName}</span>}
                     </td>
                     <td className="py-1">{m.title}</td>
@@ -309,11 +309,36 @@ export function TaskMatches(props: {
   );
 }
 
+/**
+ * A match's source with a link: the benchmark page, or the source request. `long` gives the full
+ * benchmark citation ("Benchmark FB-012, confirmed by …, based on 4 projects, updated 2026-09").
+ */
+function SourceLink({ match, long }: { match: Match; long?: boolean }) {
+  if (match.benchmark) {
+    const label = long
+      ? benchmarkSource(match.benchmark)
+      : `Benchmark ${match.benchmark.code} · ${match.benchmark.status === "CONFIRMED" ? "confirmed" : "draft"}`;
+    return (
+      <Link className="underline" href={`/benchmarks/${match.benchmark.id}`}>
+        {label}
+      </Link>
+    );
+  }
+  if (match.requestId) {
+    return (
+      <Link className="underline" href={`/estimates/${match.requestId}`}>
+        {sourceName(match)}
+      </Link>
+    );
+  }
+  return <>{sourceName(match)}</>;
+}
+
 /** The match a suggestion was taken from: the first one of the kind its method uses. */
 function sourceOf(s: { method: string; matches: Match[] }): Match {
   const kind =
-    s.method === "ARCHITECT_REFERENCE"
-      ? "ARCHITECT_REFERENCE"
+    s.method === "BENCHMARK_CONFIRMED" || s.method === "BENCHMARK_DRAFT"
+      ? s.method
       : s.method === "PRE_AI_MATCH"
         ? "APPROVED_PRE_AI"
         : "APPROVED_AI_ERA";

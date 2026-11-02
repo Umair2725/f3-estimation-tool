@@ -20,6 +20,15 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
+      testIgnore: /estimation-requests\.spec\.ts/,
+    },
+    {
+      // Checks Home's "Continue where you left off" (the Estimator's latest draft), so it runs
+      // after the specs that also create Estimator drafts, never alongside them.
+      name: "chromium-drafts",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["chromium"],
+      testMatch: /estimation-requests\.spec\.ts/,
     },
   ],
   webServer: {

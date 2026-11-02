@@ -23,6 +23,11 @@ const RULES = {
   "outcome.set": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
   // Add reference hours for a feature with no reliable match (specs/feature-matching).
   "reference.provide": ["ARCHITECT"],
+  // Feature benchmarks (specs/feature-benchmarks). Importing uses settings.manage.
+  "benchmark.edit": ["TECH_LEAD", "ARCHITECT", "ADMIN"],
+  "benchmark.confirm": ["TECH_LEAD", "ARCHITECT"],
+  "benchmark.decide": ["ARCHITECT"],
+  "benchmark.retire": ["ARCHITECT", "ADMIN"],
   "people.manage": ["ADMIN"],
   "settings.manage": ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;

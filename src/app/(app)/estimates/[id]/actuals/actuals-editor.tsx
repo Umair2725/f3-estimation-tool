@@ -7,6 +7,7 @@ import { hoursSchema } from "@/lib/estimation/schemas";
 import { formatHours } from "@/lib/estimation/totals";
 import type { ActualsView } from "@/server/actuals";
 import { saveManualAction } from "./actions";
+import { TeamLevelSelect, type TeamLevelChoice } from "./team-level";
 
 // Actual hours entered in the tool (specs/actual-hours "Record hours in the tool"). Saving
 // creates a new version; Sub tasks left empty are recorded as not built (Dropped).
@@ -53,6 +54,7 @@ export function ActualsEditor({ view }: { view: ActualsView }) {
   const [active, setActive] = useState(view.estimate[0]?.partId ?? "");
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [teamLevel, setTeamLevel] = useState<TeamLevelChoice>("");
 
   if (view.estimate.length === 0) return null;
   const part = view.estimate.find((p) => p.partId === active) ?? view.estimate[0];
@@ -61,6 +63,7 @@ export function ActualsEditor({ view }: { view: ActualsView }) {
   function save() {
     startTransition(async () => {
       const result = await saveManualAction(view.request.id, {
+        teamLevel: teamLevel || null,
         rows: [
           ...Object.entries(actuals)
             .filter(([, v]) => v.trim() !== "")
@@ -228,10 +231,11 @@ export function ActualsEditor({ view }: { view: ActualsView }) {
 
       {editable && (
         <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-4">
+          {view.request.aiEra && <TeamLevelSelect value={teamLevel} onChange={setTeamLevel} />}
           <button
             type="button"
             className={ui.primaryButton}
-            disabled={pending || !allValid}
+            disabled={pending || !allValid || (view.request.aiEra && !teamLevel)}
             onClick={save}
           >
             Save as a new version

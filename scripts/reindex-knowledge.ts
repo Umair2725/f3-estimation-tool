@@ -25,7 +25,7 @@ const embedder = embedderFor({
 reindexAll(db, embedder)
   .then(async (result) => {
     console.log(
-      `knowledge index rebuilt with ${embedder.name} embeddings: ${result.requests} requests, ${result.references} references, ${result.entries} entries`,
+      `knowledge index rebuilt with ${embedder.name} embeddings: ${result.requests} requests, ${result.benchmarks} benchmarks, ${result.entries} entries`,
     );
     await db.$disconnect();
   })

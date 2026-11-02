@@ -27,7 +27,7 @@ export async function answerReferenceAction(
 ) {
   return run(
     async () => answerReference(await getCurrentUser(), id, input),
-    "Reference hours saved. They're now used for matching.",
+    "Reference hours saved as a Draft benchmark. They're now used for matching.",
   );
 }
 

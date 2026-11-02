@@ -30,7 +30,8 @@ export function navFor(role: Role | null, counts: { reviews?: number } = {}): Na
     {
       label: "Knowledge base",
       items: [
-        { label: "Feature hours", soon: true },
+        // specs/feature-benchmarks: everyone with a role can browse the library.
+        { label: "Feature hours", href: "/benchmarks", match: "/benchmarks" },
         // Admins only (specs/historical-import); hidden from everyone else.
         ...(can(role, "settings.manage")
           ? [{ label: "Import past projects", href: "/settings/import", match: "/settings/import" }]

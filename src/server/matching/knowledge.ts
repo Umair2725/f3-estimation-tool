@@ -1,12 +1,12 @@
 // The knowledge index (specs/feature-matching "Knowledge index"): one entry per Task of each
-// request's latest approved version, plus one per Architect reference, each with its embedding.
+// request's latest approved version, plus one per usable benchmark, each with its embedding.
 // No "server-only" import: the reindex script and the seed use it with their own Prisma client.
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "../../generated/prisma/client";
 import type { Part } from "../../lib/estimation/options";
 import { entryText, type KnowledgeKind, type Match } from "../../lib/matching/suggest";
 import { readSnapshot } from "../../lib/review/snapshot";
-import { partLabel } from "../review/snapshot-source";
+import { benchmarkPartLabel, benchmarkSubTasks } from "../../lib/benchmarks/subtasks";
 import { toVectorLiteral, type Embedder } from "./embedder";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -15,8 +15,9 @@ type Entry = {
   kind: KnowledgeKind;
   requestId: string | null;
   version: number | null;
-  referenceId: string | null;
-  part: Part;
+  benchmarkId: string | null;
+  /** Null for a benchmark whose part is Any: it matches every part. */
+  part: Part | null;
   partLabel: string;
   title: string;
   description?: string;
@@ -60,11 +61,11 @@ async function insert(db: Db, embedded: Embedded[]) {
       ? actuals.reduce((n, s) => n + (s.actualTenths ?? 0), 0)
       : null;
     await db.$executeRaw`
-      INSERT INTO knowledge_item (id, kind, request_id, version, reference_id, part, part_label,
+      INSERT INTO knowledge_item (id, kind, request_id, version, benchmark_id, part, part_label,
         title, sub_tasks, min_tenths, max_tenths, actual_tenths, project_name, client_name,
         author_name, source_date, text, model, embedding)
       VALUES (${randomUUID()}, ${e.kind}::"KnowledgeKind", ${e.requestId}, ${e.version},
-        ${e.referenceId}, ${e.part}::"ProjectPart", ${e.partLabel}, ${e.title},
+        ${e.benchmarkId}, ${e.part}::"ProjectPart", ${e.partLabel}, ${e.title},
         ${JSON.stringify(e.subTasks)}::jsonb, ${total(e.subTasks, "minTenths")},
         ${total(e.subTasks, "maxTenths")}, ${actualTenths}, ${e.projectName}, ${e.clientName},
         ${e.authorName}, ${e.sourceDate}, ${text}, ${model}, ${toVectorLiteral(vector)}::vector)`;
@@ -100,7 +101,7 @@ export async function indexRequest(db: PrismaClient, embedder: Embedder, request
           kind: request.baseline === "PRE_AI" ? "APPROVED_PRE_AI" : "APPROVED_AI_ERA",
           requestId,
           version: approved.version,
-          referenceId: null,
+          benchmarkId: null,
           part: part.part,
           partLabel: part.label,
           title: task.title,
@@ -127,57 +128,62 @@ export async function indexRequest(db: PrismaClient, embedder: Embedder, request
   return entries.length;
 }
 
-export async function indexReference(db: PrismaClient, embedder: Embedder, referenceId: string) {
-  const reference = await db.featureReference.findUniqueOrThrow({
-    where: { id: referenceId },
-    include: { author: { select: { name: true } } },
+/**
+ * Re-indexes one benchmark (specs/feature-matching "Knowledge index"): an entry only while it is
+ * usable (AI-era hours, not Retired) and on a part estimates have (Design has none yet).
+ */
+export async function indexBenchmark(db: PrismaClient, embedder: Embedder, benchmarkId: string) {
+  const b = await db.featureBenchmark.findUnique({
+    where: { id: benchmarkId },
+    include: { confirmedBy: { select: { name: true } } },
   });
-  const subTasks = reference.subTasks as Entry["subTasks"];
-  const embedded = await embedEntries(embedder, [
-    {
-      kind: "ARCHITECT_REFERENCE",
-      requestId: null,
-      version: null,
-      referenceId,
-      part: reference.part,
-      partLabel: partLabel(reference.part, reference.stack),
-      title: reference.title,
-      description: reference.description,
-      subTasks,
-      projectName: null,
-      clientName: null,
-      authorName: reference.author.name,
-      sourceDate: reference.createdAt,
-    },
-  ]);
+  const subTasks = b ? benchmarkSubTasks(b) : null;
+  const usable = b && subTasks && b.status !== "RETIRED" && b.part !== "DESIGN";
+  const embedded = usable
+    ? await embedEntries(embedder, [
+        {
+          kind: b.status === "CONFIRMED" ? "BENCHMARK_CONFIRMED" : "BENCHMARK_DRAFT",
+          requestId: null,
+          version: null,
+          benchmarkId,
+          part: b.part === "ANY" ? null : (b.part as Part),
+          partLabel: benchmarkPartLabel(b.part, b.stack),
+          title: b.feature,
+          description: b.included,
+          subTasks,
+          projectName: null,
+          clientName: null,
+          authorName: b.confirmedBy?.name ?? null,
+          sourceDate: b.updatedAt,
+        },
+      ])
+    : [];
   await db.$transaction(async (tx) => {
-    await tx.knowledgeItem.deleteMany({ where: { referenceId, model: embedder.name } });
+    await tx.knowledgeItem.deleteMany({ where: { benchmarkId, model: embedder.name } });
     await insert(tx, embedded);
   });
+  return embedded.length;
 }
 
-/** Rebuilds the whole index: every latest approved version and every Architect reference. */
+/** Rebuilds the whole index: every latest approved version and every usable benchmark. */
 export async function reindexAll(db: PrismaClient, embedder: Embedder) {
   const requests = await db.estimationRequest.findMany({
     where: { approved: { some: {} } },
     select: { id: true },
   });
-  const references = await db.featureReference.findMany({ select: { id: true } });
+  const benchmarks = await db.featureBenchmark.findMany({ select: { id: true } });
   await db.knowledgeItem.deleteMany({
     where: {
       model: embedder.name,
       requestId: { notIn: requests.map((r) => r.id) },
-      referenceId: null,
+      benchmarkId: null,
     },
   });
   let entries = 0;
   for (const r of requests) entries += await indexRequest(db, embedder, r.id);
-  for (const r of references) await indexReference(db, embedder, r.id);
-  return {
-    requests: requests.length,
-    references: references.length,
-    entries: entries + references.length,
-  };
+  let usable = 0;
+  for (const b of benchmarks) usable += await indexBenchmark(db, embedder, b.id);
+  return { requests: requests.length, benchmarks: usable, entries: entries + usable };
 }
 
 type Row = {
@@ -196,9 +202,18 @@ type Row = {
   max_tenths: number;
   actual_tenths: number | null;
   source_date: Date;
+  benchmark_id: string | null;
+  b_code: string | null;
+  b_status: "DRAFT" | "CONFIRMED" | "RETIRED" | null;
+  b_confirmed_by: string | null;
+  b_projects: number | null;
+  b_updated_at: Date | null;
 };
 
-/** Up to `limit` entries on the same part, most similar first, never from `excludeRequestId`. */
+/**
+ * Up to `limit` entries on the same part (or a benchmark for any part), most similar first, never
+ * from `excludeRequestId`.
+ */
 export async function searchKnowledge(
   db: Db,
   input: {
@@ -211,13 +226,18 @@ export async function searchKnowledge(
 ): Promise<Match[]> {
   const q = toVectorLiteral(input.vector);
   const rows = await db.$queryRaw<Row[]>`
-    SELECT id, kind, 1 - (embedding <=> ${q}::vector) AS similarity, request_id, version,
-      project_name, client_name, author_name, part_label, title, sub_tasks, min_tenths,
-      max_tenths, actual_tenths, source_date
-    FROM knowledge_item
-    WHERE model = ${input.model} AND part = ${input.part}::"ProjectPart"
-      AND (request_id IS NULL OR request_id <> ${input.excludeRequestId})
-    ORDER BY embedding <=> ${q}::vector
+    SELECT k.id, k.kind, 1 - (k.embedding <=> ${q}::vector) AS similarity, k.request_id,
+      k.version, k.project_name, k.client_name, k.author_name, k.part_label, k.title,
+      k.sub_tasks, k.min_tenths, k.max_tenths, k.actual_tenths, k.source_date, k.benchmark_id,
+      b.code AS b_code, b.status::text AS b_status, u.name AS b_confirmed_by,
+      b.projects_count AS b_projects, b.updated_at AS b_updated_at
+    FROM knowledge_item k
+    LEFT JOIN feature_benchmark b ON b.id = k.benchmark_id
+    LEFT JOIN "user" u ON u.id = b.confirmed_by_id
+    WHERE k.model = ${input.model}
+      AND (k.part = ${input.part}::"ProjectPart" OR k.part IS NULL)
+      AND (k.request_id IS NULL OR k.request_id <> ${input.excludeRequestId})
+    ORDER BY k.embedding <=> ${q}::vector
     LIMIT ${input.limit ?? 5}`;
   return rows.map((r) => ({
     id: r.id,
@@ -235,5 +255,16 @@ export async function searchKnowledge(
     maxTenths: r.max_tenths,
     actualTenths: r.actual_tenths,
     sourceDate: r.source_date.toISOString().slice(0, 10),
+    benchmark:
+      r.benchmark_id && r.b_code && r.b_status
+        ? {
+            id: r.benchmark_id,
+            code: r.b_code,
+            status: r.b_status,
+            confirmedByName: r.b_confirmed_by,
+            projectsCount: r.b_projects ?? 0,
+            updatedAt: (r.b_updated_at ?? r.source_date).toISOString().slice(0, 10),
+          }
+        : null,
   }));
 }

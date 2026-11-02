@@ -54,8 +54,8 @@ export default async function ReferencePage({ params }: PageProps<"/references/[
           <dd>{ask.note || "–"}</dd>
         </dl>
         <p className="mt-3 text-muted">
-          Your hours are stored as an Architect reference (AI era) and used for this feature and
-          every similar one in later requests. The client isn&apos;t stored with them.
+          Your hours become a Draft benchmark in Feature hours, used for this feature and every
+          similar one in later requests. The client isn&apos;t stored with them.
         </p>
       </section>
 
@@ -69,7 +69,8 @@ export default async function ReferencePage({ params }: PageProps<"/references/[
       )}
       {ask.status === "ANSWERED" && (
         <p role="status" className="rounded-lg bg-ok-bg px-3.5 py-3 text-sm text-ok">
-          {ask.architectName} added reference hours. They&apos;re now used for matching.
+          {ask.architectName} added reference hours. They&apos;re now a Draft benchmark used for
+          matching.
         </p>
       )}
       {ask.status === "DECLINED" && (

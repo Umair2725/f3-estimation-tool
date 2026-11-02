@@ -291,6 +291,29 @@ The tool suggests hours for each Task (one feature on one part) from Folio3's ap
   - `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` (default `claude-opus-5-5`) are for AI guesses.
 - **First run:** `npm run embeddings:download`, then `npm run reindex-knowledge`. The seed also rebuilds the index, and the Docker image has the model built in.
 
+## Feature hours
+
+The benchmark library (**Knowledge base → Feature hours**) holds what common features really take with AI. They're used first in matching.
+
+- **Each benchmark** has an ID (`FB-012`), part and stack, what one instance includes, pre-AI hours (for comparison only), and AI-era hours: **experienced developer → Min** and **junior developer → Max**.
+  - Status is Draft, Confirmed or Retired.
+  - A benchmark without AI-era hours is never suggested. Design benchmarks wait until estimates have a Design part.
+- **Import** (Admins): `data/feature-benchmarks.csv` (166 features) or the filled-in `feature-hours-survey.xlsx`.
+  - You see a preview, and nothing is saved until you apply it.
+  - Hours in the file become observations.
+  - A "Confirmed by" name stays a note: only a Tech Lead or Architect can confirm in the tool.
+- **Who can do what:**
+  - Tech Leads, Architects and Admins add and edit.
+  - Tech Leads and Architects confirm. Editing a confirmed benchmark's hours sends it back to Draft.
+  - Architects and Admins retire.
+- **Observations** are entered by Tech Leads and Architects, or come from **actual hours**. When saving actuals for an AI-era project you choose the team level, and Sub tasks taken from a benchmark feed it. Mixed teams are recorded but not used.
+- **Recalculation** is a weighted mean, where the last 6 months count double.
+  - A confirmed benchmark that would move more than 15% gets a **proposal** for an Architect on the Reviews page.
+  - Every change is in the benchmark's **change log**, and the **trend** shows the hours over time.
+- **Matching order:** a Confirmed benchmark, then a Draft benchmark, then the earlier sources. Accepting a benchmark links the Sub tasks to it.
+- **Architect references** (answers to "Ask an Architect") become Draft benchmarks numbered FB-9001 onward.
+- **The seed** imports the 166-row list and adds three **development sample values** (FB-012, FB-023 confirmed, FB-027), labelled "Development sample, not real data".
+
 ## Scripts
 
 | Script | What it does |
