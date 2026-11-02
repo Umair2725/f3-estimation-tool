@@ -221,7 +221,7 @@ export default async function BenchmarkPage({ params }: PageProps<"/benchmarks/[
                   <tr>
                     <th className="py-1 text-left font-semibold">Date</th>
                     <th className="py-1 text-left font-semibold">Level</th>
-                    <th className="py-1 text-right font-semibold">Hours</th>
+                    <th className="py-1 pr-6 text-right font-semibold">Hours</th>
                     <th className="py-1 text-left font-semibold">Source</th>
                     <th className="py-1 text-left font-semibold">Project</th>
                     <th className="py-1 text-left font-semibold">By</th>
@@ -232,7 +232,9 @@ export default async function BenchmarkPage({ params }: PageProps<"/benchmarks/[
                     <tr key={o.id} className="border-t border-border">
                       <td className="py-1">{day(o.observedOn)}</td>
                       <td className="py-1">{LEVEL_LABELS[o.level]}</td>
-                      <td className="py-1 text-right tabular-nums">{hours(o.hoursTenths)} h</td>
+                      <td className="py-1 pr-6 text-right tabular-nums">
+                        {hours(o.hoursTenths)} h
+                      </td>
                       <td className="py-1">
                         {SOURCE_LABELS[o.source]}
                         {o.aiTools && <span className="text-muted"> · {o.aiTools}</span>}
