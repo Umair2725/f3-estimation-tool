@@ -50,7 +50,7 @@
 ## 5. Verification
 
 - [ ] 5.1 Run lint, typecheck, unit, integration, e2e and the build, all green. Then on UAT with the product owner's Gmail app password in `.env`: Send test email arrives, and an invitation and a submit-for-review email arrive with working links.
-- [ ] 5.2 Open a PR. Verify CI is green on the PR.
+- [x] 5.2 Open a PR. Verify CI is green on the PR.
 
 ## Workflow follow-up
 

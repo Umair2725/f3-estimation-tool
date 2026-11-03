@@ -134,11 +134,11 @@ Every status change SHALL record the person, the time, the from and to statuses,
 - **THEN** the history lists four entries with names, times and the changes comment
 
 ### Requirement: In-app review notifications
-The assigned Approver SHALL be notified in the app when a request is submitted to them; the owner SHALL be notified when changes are requested and when the request is approved. Home SHALL show "Awaiting my review" to Approvers with waiting requests, and the owner's unread updates. Opening the request SHALL mark its notifications read for that person. Email notifications are not part of this requirement.
+The assigned Approver SHALL be notified in the app when a request is submitted to them; the owner SHALL be notified when changes are requested and when the request is approved. Home SHALL show "Awaiting my review" to Approvers with waiting requests, and owners their unread updates. Opening the request SHALL mark its notifications read for that person. Each notification SHALL also be emailed to the same person (specs/email-notifications) and SHALL show in the app even if the email isn't sent.
 
 #### Scenario: Owner sees changes requested
 - **WHEN** the Approver requests changes
-- **THEN** the owner's Home shows "Changes requested on <project> by <name>" until they open the request
+- **THEN** the owner's Home shows "Changes requested on <project> by <name>" until they open the request, and the owner is emailed the same update with the comment
 
 ### Requirement: Reviews page
 People with the Tech Lead or Architect role SHALL have a Reviews page listing the requests waiting for their review, oldest first, and the requests they reviewed in the last 30 days; the sidebar Reviews entry SHALL link there and show how many are waiting.

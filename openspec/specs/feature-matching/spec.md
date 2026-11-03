@@ -7,7 +7,7 @@ Defines how the tool suggests hours for each Task of an estimate from Folio3's a
 ## Requirements
 
 ### Requirement: Knowledge index
-The knowledge index SHALL hold one entry per Task of each request's latest approved version, plus one entry per Architect reference, and nothing else: drafts, requests in review and unapproved later versions SHALL never be indexed.
+The knowledge index SHALL hold one entry per Task of each request's latest approved version, plus one entry per benchmark that is usable for suggestions (it has experienced-developer hours and is not Retired), and nothing else: drafts, requests in review, unapproved later versions and benchmarks without AI-era hours SHALL never be indexed. A benchmark's entry SHALL be updated whenever its hours, status or text change.
 
 #### Scenario: Approval adds entries
 - **WHEN** a request with two Tasks is approved as version 1
@@ -21,12 +21,20 @@ The knowledge index SHALL hold one entry per Task of each request's latest appro
 - **WHEN** actual hours are saved for an indexed delivered project
 - **THEN** its entries show the actual hours of their Sub tasks
 
+#### Scenario: Benchmark gets hours
+- **WHEN** a benchmark with no AI-era hours receives experienced hours of 4
+- **THEN** it is added to the index; when it is retired, it is removed
+
 ### Requirement: What an index entry records
-Each index entry SHALL record its source (request and version, or Architect reference), project and client when it has them, date, part and stack, Task and Sub task titles, Min and Max, whether its hours are pre-AI, AI-era or Architect-confirmed, and actual hours when recorded.
+Each index entry SHALL record its source (request and version, or benchmark ID), project and client when it has them, date, part and stack, Task and Sub task titles, Min and Max, whether its hours are pre-AI, AI-era or a Confirmed or Draft benchmark, and actual hours when recorded. A benchmark whose part is Any SHALL match Tasks on every part.
 
 #### Scenario: Imported entry
 - **WHEN** an imported delivered project is indexed
 - **THEN** its entries are marked pre-AI and carry the project, client, approval date and actual hours
+
+#### Scenario: Any part
+- **WHEN** a benchmark has part Any and a Mobile Task matches it
+- **THEN** it is among the Mobile Task's matches
 
 ### Requirement: Local embeddings
 Index entries and searches SHALL use text embeddings computed on Folio3's own server by an open-source model; estimate text SHALL NOT be sent to any outside service to compute them. A rebuild command SHALL recreate the whole index from the approved versions and Architect references.
@@ -47,21 +55,29 @@ On the estimate page, anyone with a role SHALL be able to see the matches of a T
 - **THEN** its own approved version is not among them
 
 ### Requirement: How a match is shown
-Each match SHALL show its similarity as a percentage, its source (project and client, or "Architect reference by <name>"), date, part and stack, Min and Max, actual hours when recorded, and a link to the source request where there is one.
+Each match SHALL show its similarity as a percentage, its source (project and client, or "Benchmark <ID>" with its status), date, part and stack, Min and Max, actual hours when recorded, and a link to the source request or benchmark.
 
 #### Scenario: Architect reference match
-- **WHEN** a match is an Architect reference
-- **THEN** it shows "Architect reference by <name>" and its date, with no request link
+- **WHEN** a match is the Draft benchmark created from Dev Architect's reference hours
+- **THEN** it shows "Benchmark <ID> · draft" and its date, with a link to the benchmark
+
+#### Scenario: Benchmark match
+- **WHEN** a match is Confirmed benchmark FB-012
+- **THEN** it shows "Benchmark FB-012 · confirmed" and its last update, with a link to the benchmark
 
 ### Requirement: Suggestion order and labels
-Among matches at or above the similarity threshold, each Task's suggestion SHALL use the first available of: an Architect reference; AI-era actual hours from delivered work; an approved AI-era estimate ("Approved AI-era estimate"); the most similar pre-AI match. When none reaches the threshold, it SHALL be "No reliable match". The suggestion SHALL always state which it used.
+Among matches at or above the similarity threshold, each Task's suggestion SHALL use the first available of: a Confirmed benchmark, a Draft benchmark, AI-era actual hours, an approved AI-era estimate ("Approved AI-era estimate"), the most similar pre-AI match; otherwise "No reliable match". It SHALL state its source, for benchmarks as "Benchmark <ID>, confirmed by <name>, based on <N> projects, updated <YYYY-MM>" or "Draft benchmark <ID>, not confirmed yet".
+
+#### Scenario: Confirmed benchmark first
+- **WHEN** a Task matches Confirmed benchmark FB-012 and an imported pre-AI Task above the threshold
+- **THEN** the suggestion uses FB-012's experienced–junior hours and says "Benchmark FB-012, confirmed by <name>, based on <N> projects, updated <YYYY-MM>"
 
 #### Scenario: Architect reference first
-- **WHEN** a Task matches both an Architect reference and an imported pre-AI Task above the threshold
-- **THEN** the suggestion uses the Architect reference and says "Architect reference by <name>"
+- **WHEN** a Task matches the Draft benchmark created from an Architect's reference hours and an imported pre-AI Task above the threshold
+- **THEN** the suggestion uses the Draft benchmark and says "Draft benchmark <ID>, not confirmed yet"
 
 #### Scenario: AI-era actuals before pre-AI
-- **WHEN** a similar Task from a delivered AI-era project has actual hours of 38 and there is no Architect reference
+- **WHEN** a similar Task from a delivered AI-era project has actual hours of 38 and there is no benchmark
 - **THEN** the suggestion uses those hours and says "Based on actual hours (AI era)" with the source
 
 #### Scenario: Pre-AI match
@@ -98,29 +114,37 @@ For a Task with no reliable match, people who may edit the request SHALL be able
 - **THEN** it is refused with "Choose an Architect"
 
 ### Requirement: Architect adds reference hours
-Only the Architect asked SHALL be able to answer: either add reference hours (a title, an optional description, the part and stack, and at least one Sub task with Min and Max, which they may edit from the feature as asked) or decline with a reason.
+Only the Architect asked SHALL be able to answer: either add reference hours (a title, an optional description, the part and stack, and at least one Sub task with Min and Max, which they may edit from the feature as asked) or decline with a reason. Added reference hours SHALL be stored as a Draft benchmark with the next free ID, the request's part and stack, the Sub tasks as its breakdown, experienced hours equal to the Sub tasks' total Min and junior hours equal to their total Max.
 
 #### Scenario: Someone else answers
 - **WHEN** a different Architect tries to answer the request
 - **THEN** it is refused with 403
 
+#### Scenario: Stored as a benchmark
+- **WHEN** Dev Architect adds "Offline sync" for Backend (Node.js) with Sub tasks totalling 16–24 h
+- **THEN** a Draft benchmark "Offline sync" exists with 16–24 h and the Sub tasks as its breakdown
+
 ### Requirement: References are kept for future matching
-Added reference hours SHALL be stored as an Architect reference, marked AI-era and Architect-confirmed, and indexed at once for all future matching. The person who asked SHALL be notified, and the Task's matches SHALL be refreshed so the reference becomes its suggestion. A declined request SHALL notify the person who asked, with the reason.
+The benchmark created from reference hours SHALL be indexed at once for all future matching. The person who asked SHALL be notified, and the Task's matches SHALL be refreshed so the benchmark becomes its suggestion. A declined request SHALL notify the person who asked, with the reason.
 
 #### Scenario: Reference added
 - **WHEN** Dev Architect adds "Offline sync" for Backend (Node.js) with Sub tasks totalling 16–24 h
-- **THEN** the estimator is notified, the Task's suggestion becomes "Architect reference by Dev Architect" at 16–24 h, and a later request with a similar Backend Task also gets it as a match
+- **THEN** the estimator is notified, the Task's suggestion becomes that Draft benchmark at 16–24 h, and a later request with a similar Backend Task also gets it as a match
 
 #### Scenario: Declined
 - **WHEN** Dev Architect declines with "Too vague, needs the client's sync rules"
 - **THEN** the estimator is notified with that reason and the Task shows "No reliable match" again with the option to ask
 
 ### Requirement: Accept, Adjust or Reject
-People who may edit the request SHALL be able to Accept, Adjust or Reject each suggestion; Adjust SHALL require a reason. Accept and Adjust SHALL replace the Task's Sub tasks with the suggestion's Sub tasks, each with a comment naming its source ("From <project> v<version>, <part label>", "From Architect reference by <name>") or "AI-generated, no historical reference"; the estimator can then edit them. Nothing SHALL change the hours without one of these actions.
+People who may edit the request SHALL be able to Accept, Adjust (with a required reason) or Reject each suggestion. Accept and Adjust SHALL replace the Task's Sub tasks with the suggestion's, each commented with its source ("From <project> v<version>, <part label>", "From benchmark <ID>") or "AI-generated, no historical reference", and then editable. Sub tasks from a benchmark SHALL stay linked to it. Nothing SHALL change the hours without one of these actions.
 
 #### Scenario: Accept
 - **WHEN** the estimator accepts a pre-AI suggestion from "Patient portal MVP" v1
 - **THEN** the Task's Sub tasks are replaced by the source's, each commented "From Patient portal MVP v1, Backend (Node.js)", and the decision is stored as Accepted
+
+#### Scenario: Benchmark link kept
+- **WHEN** the estimator accepts benchmark FB-012
+- **THEN** the new Sub tasks are commented "From benchmark FB-012" and linked to FB-012, so their actual hours can become observations
 
 #### Scenario: Adjust without a reason
 - **WHEN** the estimator chooses Adjust without a reason

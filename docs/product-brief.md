@@ -3,9 +3,13 @@
 | | |
 |---|---|
 | **Owner** | Umair Khan (Project Manager, Folio3) |
-| **Status** | Draft v0.7, input for OpenSpec proposals |
-| **Last updated** | 2026-10-29 |
+| **Status** | Draft v0.8, input for OpenSpec proposals |
+| **Last updated** | 2026-11-02 |
 | **Output template** | [docs/templates/Empty_Estimation_Sheet.xlsx](templates/Empty_Estimation_Sheet.xlsx) ("Folio3 Project Estimation Template v 0.5") |
+
+**Changes in v0.8:** the product owner's decisions of 2026-11-02 (section 14).
+- **F-05 AI-assisted reduction is out of scope.** Pre-AI matches are shown with their original hours and labelled pre-AI; the estimator adjusts them. AI-era benchmarks (F-24) and AI-era actual hours remain the way the tool reflects work with AI.
+- **F-09 reads PDFs with Claude**, which handles scanned pages and gives page citations. DOCX is converted to text first.
 
 **Changes in v0.7:** the product owner's answers of 2026-10-29 are recorded (section 14).
 - **Feature hours survey:** 166 common features in [data/feature-hours-survey.xlsx](../data/feature-hours-survey.xlsx), for Tech Leads to record real hours with AI (experienced and junior developer).
@@ -111,7 +115,7 @@ For each feature, the tool searches the knowledge base and shows:
 - A **suggested Min/Max**, chosen in this order:
   1. a **confirmed AI-era benchmark** for the feature (F-24), if one exists for that part and stack;
   2. otherwise, **AI-era actual hours** from similar features in delivered projects (F-12);
-  3. otherwise, the best **pre-AI** matches, adjusted for tech stack and compliance (F-06) and reduced for AI-assisted development (F-05);
+  3. otherwise, the best **pre-AI** matches, adjusted for tech stack and compliance (F-06) and shown with their original, pre-AI hours (F-05 is out of scope, decision of 2026-11-02);
   4. otherwise, an AI-only guess, clearly labeled.
 
   The suggestion always says which of these it used.
@@ -122,6 +126,8 @@ For each feature, the tool searches the knowledge base and shows:
 **Acceptance:** Every proposed number either links to at least one source estimate or is labeled "AI-generated, no historical reference".
 
 ### F-05 AI-assisted development reduction (fallback)
+> **Out of scope (decision of 2026-11-02).** Not built. Kept here for reference only; it may be reconsidered once AI-era benchmarks and actual hours show whether a reduction is still needed.
+
 Historical hours reflect manual development. Folio3's teams now use AI tools for most of the coding. **When no AI-era benchmark (F-24) or AI-era actual hours exist for a feature**, the tool reduces **baseline** hours (historical or AI-guessed) before suggesting them. As the benchmarks grow, fewer features need this fallback.
 
 - **Reduction factors by task category**, set by Admins. Starting defaults, to be calibrated against actual hours:
@@ -410,7 +416,7 @@ Today, nobody records actual hours per feature. The estimate's Min and Max are b
 - Benchmarks can be imported from the CSV, edited in the tool, and confirmed only by a Tech Lead or Architect.
 - A matching confirmed benchmark is always offered before pre-AI history.
 - Every change to a benchmark's hours is traceable to its observations.
-- A benchmark with no AI-era hours is never used as priority 1; the tool falls back to F-05.
+- A benchmark with no AI-era hours is never used as priority 1; the tool falls back to AI-era actuals, then pre-AI matches.
 
 ## 6. Additional features (product owner recommendations)
 
@@ -484,12 +490,13 @@ Removed from v0.1 because the lean output doesn't need them: the per-role hour s
 
 | Phase | Scope |
 |---|---|
-| **Release 1** (MVP) | F-01 Auth, F-02 Home, F-03 Request wizard, F-07 Lean Excel export, **F-08 Historical import**, F-04 Matching with references, F-05 AI reduction, **F-09 Document upload**, **F-10 Review and approval**, **F-12 Actual hours** (actuals Excel upload and accuracy report), **bulk load of delivered projects**, **F-24 AI-era feature benchmarks** (CSV import, Architect confirmation, use in estimates, learning from actuals) |
+| **Release 1** (MVP) | F-01 Auth, F-02 Home, F-03 Request wizard, F-07 Lean Excel export, **F-08 Historical import**, F-04 Matching with references, **F-09 Document upload**, **F-10 Review and approval**, **F-12 Actual hours** (actuals Excel upload and accuracy report), **bulk load of delivered projects**, **F-24 AI-era feature benchmarks** (CSV import, Architect confirmation, use in estimates, learning from actuals) |
 | **Release 1.1** | F-13 Clarifying questions, F-06 Adjustment rules, F-12 calibration report, F-11 Versions, more requirement document formats |
 | **Release 1.2** | F-14 Confidentiality, F-15 Feature library, F-20 Audit log |
 | **Later** | F-16 Starter templates, F-19 Jira/Slack integrations |
+| **Out of scope** | F-05 AI-assisted reduction (decision of 2026-11-02) |
 
-Release 1 is larger now. If it needs to ship sooner, split it at the natural boundary: **1a** = Auth, Home, Wizard, Excel export, Historical import (with actuals), Review (a usable tool without AI, already loaded with past data); **1b** = Matching, AI reduction, Document upload.
+Release 1 is larger now. If it needs to ship sooner, split it at the natural boundary: **1a** = Auth, Home, Wizard, Excel export, Historical import (with actuals), Review (a usable tool without AI, already loaded with past data); **1b** = Matching, Document upload.
 
 ## 12. Suggested OpenSpec changes, in order
 
@@ -505,7 +512,7 @@ Each item is a separate `/opsx:propose` run:
 8. `add-review-and-approval-workflow` (F-10): must exist before matching, so only approved estimates are searched
 9. `add-ai-feature-matching-with-citations` (F-04)
 10. `add-feature-benchmarks` (F-24): benchmark table, CSV import, confirmation, observations and recalculation; used as priority 1 in matching
-11. `add-ai-assisted-reduction-factors` (F-05): the fallback when no benchmark exists
+11. ~~`add-ai-assisted-reduction-factors` (F-05)~~: out of scope (2026-11-02)
 12. `add-requirement-document-extraction` (F-09)
 13. Then the Release 1.1 items, one change each (F-23 SOW draft first, if approved)
 
@@ -549,6 +556,8 @@ All questions so far are answered; the answers are in the decisions log (section
 | 2026-10-29 | **Approved hourly rates: $25, $30, $35, $40, $45, $50**; default $30 | F-07 |
 | 2026-10-29 | **Internal demos may use real past estimates** | Section 17 |
 | 2026-10-29 | **Hosting:** demo first (no fixed host), then **Folio3 AWS** (section 17) | Section 17 |
+| 2026-11-02 | **F-05 AI-assisted reduction is out of scope.** Pre-AI matches keep their original hours, labelled pre-AI; AI-era benchmarks and actuals reflect work with AI | F-05, F-04 |
+| 2026-11-02 | **F-09 sends PDFs to Claude as documents** (scans and page citations included); DOCX is converted to text. Extraction covers features, request details, assumptions, risks and client questions | F-09 |
 
 ## 15. Findings from sample past estimates
 
@@ -646,7 +655,7 @@ One language, TypeScript, across the whole tool. This fits the React and Node.js
 | App (screens + API) | **Next.js (React)**, one app | Small internal tool, fastest to build and demo. Can split out a NestJS API later if it grows |
 | Database | **PostgreSQL + pgvector**, with Prisma | Relational data and similarity search in one database |
 | Excel read/write | **ExcelJS** | Keeps the template's styles and formulas; already used successfully to read the sample estimates and to build the survey workbook |
-| Word / PDF reading | DOCX: mammoth. PDF: a text extractor with an OCR fallback | Covers SOWs and RFPs (F-09) |
+| Word / PDF reading | DOCX: mammoth to text. PDF: sent to Claude as a document, which reads scanned pages and cites pages | Covers SOWs and RFPs (F-09); no OCR engine to run (decision of 2026-11-02) |
 | AI | Anthropic SDK (demo) / Amazon Bedrock (AWS) | Claude, as decided |
 | Sign-in | Auth.js | Google sign-in restricted to `@folio3.com`; email sign-in as a fallback for local development |
 | Background work (imports, extraction) | A job queue on PostgreSQL (e.g. pg-boss) | No extra infrastructure |

@@ -28,4 +28,4 @@
 
 - [x] 5.1 E2E `e2e/benchmarks.spec.ts`: an Admin imports the seed CSV (preview → apply); a Tech Lead adds an observation and confirms; a request Task gets "Benchmark FB-…, confirmed by …" and accepting it links the Sub task; an observation over 15% creates a proposal that an Architect accepts.
 - [x] 5.2 Run the full local check (format, lint, typecheck, unit, integration, build, e2e twice), all passing.
-- [ ] 5.3 Verify CI is green on the pull request.
+- [x] 5.3 Verify CI is green on the pull request.
