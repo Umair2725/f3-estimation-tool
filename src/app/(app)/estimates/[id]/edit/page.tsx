@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireRole } from "@/server/auth/session";
+import { listDocuments } from "@/server/documents/files";
 import { getRequest } from "@/server/estimation-requests";
 import { ServiceError } from "@/server/service-error";
 import type { Step } from "@/lib/estimation/options";
 import { wizardProps } from "../../wizard/load";
 import { Wizard } from "../../wizard/wizard";
+import { DocumentsPanel } from "../documents/documents-panel";
 
 export const metadata: Metadata = { title: "Edit estimation request · F3 Estimation Tool" };
 
@@ -26,5 +28,18 @@ export default async function EditRequestPage({
 
   const asked = Number(Array.isArray(rawStep) ? rawStep[0] : rawStep);
   const step = ([1, 2, 3, 4].includes(asked) ? asked : request.lastStep) as Step;
-  return <Wizard key={id} {...await wizardProps(user, request, step)} />;
+  const documents = await listDocuments(user, id);
+  return (
+    <Wizard
+      key={id}
+      {...await wizardProps(user, request, step)}
+      documentsPanel={
+        <DocumentsPanel
+          requestId={id}
+          canEdit
+          documents={documents.map((d) => ({ ...d, addedAt: d.addedAt?.toISOString() ?? null }))}
+        />
+      }
+    />
+  );
 }

@@ -55,7 +55,7 @@ test.describe("as an Estimator", () => {
     await page.getByLabel("Security", { exact: true }).check();
     await page.getByLabel("Note for Security").fill("Pen test before launch");
     await page.getByRole("button", { name: "Next: Requirements" }).click();
-    await expect(page.getByText("Document upload (PDF or DOCX) is coming soon")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Requirement documents" })).toBeVisible();
 
     // Finish lists what's missing.
     await page.getByRole("button", { name: "Finish" }).click();

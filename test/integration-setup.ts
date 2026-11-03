@@ -18,6 +18,8 @@ Object.assign(process.env, {
   ANTHROPIC_API_KEY: "",
   // Never real email from tests: they swap in a fake transport (specs/email-notifications).
   SMTP_HOST: "",
+  // Tests swap in a fake document reader; by default none is set up (no Claude calls).
+  DOCUMENT_READER: "claude",
 });
 
 if (!process.env.DATABASE_URL) {

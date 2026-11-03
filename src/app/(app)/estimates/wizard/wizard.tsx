@@ -181,6 +181,7 @@ export function Wizard(props: WizardProps) {
                 onChange={(v) => update(4, v)}
                 errors={errors}
                 parts={saved[2].parts.map((p) => p.part)}
+                documentsPanel={props.documentsPanel}
               />
             )}
           </section>

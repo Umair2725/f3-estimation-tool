@@ -44,6 +44,11 @@ export const envSchema = z
       z.enum(["local", "stub"]).default("local"),
     ),
     EMBEDDINGS_CACHE_DIR: optionalText,
+    // Requirement documents (specs/requirement-documents): Claude reads them; "stub" is for tests.
+    DOCUMENT_READER: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["claude", "stub"]).default("claude"),
+    ),
     // Optional: without a key, AI guesses are off. Never logged or shown.
     ANTHROPIC_API_KEY: optionalText,
     ANTHROPIC_MODEL: optionalText,
@@ -83,6 +88,13 @@ export const envSchema = z
       for (const name of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const) {
         if (!env[name]) ctx.addIssue({ code: "custom", path: [name], message: "required" });
       }
+    }
+    if (production && env.DOCUMENT_READER === "stub") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DOCUMENT_READER"],
+        message: "not allowed in production",
+      });
     }
     if (env.SMTP_HOST) {
       for (const name of ["SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"] as const) {

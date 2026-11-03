@@ -79,7 +79,7 @@ async function loadTasks(db: Tx | ReturnType<typeof getDb>, requestId: string, t
 }
 
 /** Searches and stores the suggestion of each Task; no permission check (callers check). */
-async function computeSuggestions(requestId: string, taskIds?: string[]) {
+export async function computeSuggestions(requestId: string, taskIds?: string[]) {
   const db = getDb();
   const tasks = await loadTasks(db, requestId, taskIds);
   if (tasks.length === 0) return 0;

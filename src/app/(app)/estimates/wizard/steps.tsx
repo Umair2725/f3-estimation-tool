@@ -390,6 +390,7 @@ export function Step4(props: {
   onChange: (value: Step4State) => void;
   errors: Errors;
   parts: Part[];
+  documentsPanel?: React.ReactNode;
 }) {
   const { features } = props.value;
   const setFeatures = (next: FeatureState[]) => props.onChange({ features: next });
@@ -405,15 +406,7 @@ export function Step4(props: {
 
   return (
     <div className="flex flex-col gap-5">
-      <div
-        aria-disabled="true"
-        className="rounded-xl border-2 border-dashed border-border-strong px-4 py-5 text-center"
-      >
-        <p className="font-semibold">Upload the client&apos;s requirements</p>
-        <p className="mt-1 text-sm text-muted">
-          Document upload (PDF or DOCX) is coming soon. For now, add the features by hand.
-        </p>
-      </div>
+      {props.documentsPanel}
 
       {props.parts.length === 0 && (
         <p className="rounded-lg bg-warn-bg px-3.5 py-3 text-sm text-warn">

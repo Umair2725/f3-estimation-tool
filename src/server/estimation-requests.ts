@@ -55,7 +55,7 @@ function parse<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
   return parsed.data;
 }
 
-async function upsertClient(tx: Tx, name: string): Promise<string | null> {
+export async function upsertClient(tx: Tx, name: string): Promise<string | null> {
   const trimmed = name.trim().replace(/\s+/g, " ");
   if (!trimmed) return null;
   const client = await tx.client.upsert({
