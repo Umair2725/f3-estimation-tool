@@ -10,6 +10,7 @@ describe("classifyPath", () => {
       "/api/health",
       "/robots.txt",
       "/favicon.ico",
+      "/folio3-logo.png",
       "/_next/static/chunks/app.js",
     ]) {
       expect(classifyPath(path)).toBe("public");

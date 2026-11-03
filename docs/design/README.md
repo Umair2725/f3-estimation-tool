@@ -27,7 +27,7 @@ The prototype is a single self-contained HTML file with **fictional demo data** 
 
 **Status colours** (green = done or approved, blue = in review, amber = needs attention, red = errors) and an **AI purple** (`#6D28D9`) for "AI guess" items have their own tokens, so they never clash with the brand red. **Dark mode** has its own token set; it follows the system setting and can be switched in the sidebar.
 
-**Logo:** the prototype *links* to the official logo PNG on Folio3's CDN, and falls back to a text wordmark if it doesn't load. It isn't downloaded into the repository (see Open questions).
+**Logo:** the app uses the official logo PNG supplied by the product owner (`public/folio3-logo.png`, 2026-11-03), unchanged apart from trimming the empty border. It has a white background, so it sits on a white tile that stays white in dark mode. The prototype still *links* to the PNG on Folio3's CDN.
 
 ## 2. Screen map
 
@@ -105,7 +105,7 @@ These were taken as recommended defaults; change any of them.
 
 ## 7. Open questions for the product owner
 
-1. **Logo file:** may we download the official logo (and favicon) into the repository, or should we ask Folio3 marketing for the official SVG and brand guidelines?
+1. **Logo file:** answered 2026-11-03: the product owner supplied the official PNG, now in the repository. Still open: an official SVG and favicon from Folio3 marketing.
 2. **Logo dot blue:** the exact blue of the logo's middle dot isn't in the website's CSS. The prototype uses `#2F6FED` for the sign-in illustration. Is there an official value?
 3. **Sign-in illustration:** keep the abstract brand-dot artwork, or use a photo, as folio3.com does?
 4. **Screens to prioritise** for the first build after sign-in: the recommendation is Home → Wizard (without upload) → Estimate workspace → Export, which matches the OpenSpec order in the brief.

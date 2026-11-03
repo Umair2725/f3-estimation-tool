@@ -2,7 +2,13 @@
 
 export type RouteKind = "public" | "api" | "page";
 
-const PUBLIC_EXACT = new Set(["/sign-in", "/api/health", "/robots.txt", "/favicon.ico"]);
+const PUBLIC_EXACT = new Set([
+  "/sign-in",
+  "/api/health",
+  "/robots.txt",
+  "/favicon.ico",
+  "/folio3-logo.png",
+]);
 const PUBLIC_PREFIXES = ["/api/auth/", "/_next/"];
 
 export function classifyPath(pathname: string): RouteKind {
