@@ -64,7 +64,7 @@ Step 3 SHALL record hosting (AWS, Azure, Google Cloud, on-premises, client-manag
 - **THEN** the request page shows HIPAA under compliance and Security with "Pen test before launch"
 
 ### Requirement: Requirements step
-Step 4 SHALL let the person add, edit, reorder and remove features, each with a name (required), an optional short description, and one or more of the request's chosen parts. The document upload area SHALL be shown as not yet available.
+Step 4 SHALL let the person add, edit, reorder and remove features, each with a name (required), an optional short description, and one or more of the request's chosen parts. It SHALL also show the request's requirement documents with their status, the upload area for people who may edit the request, and a link to review each document that is ready (specs/requirement-documents).
 
 #### Scenario: Add a feature
 - **WHEN** a person adds the feature "Appointment booking" with the description "Doctor availability, reminders" for Web/Frontend and Backend
@@ -75,8 +75,8 @@ Step 4 SHALL let the person add, edit, reorder and remove features, each with a 
 - **THEN** the feature is not saved and the form shows "Choose at least one part"
 
 #### Scenario: Upload not yet available
-- **WHEN** a person views the Requirements step
-- **THEN** the upload area says document upload is coming soon and accepts no files
+- **WHEN** a person who may edit the request views the Requirements step
+- **THEN** the upload area accepts PDF and Word (.docx) files instead of saying document upload is coming soon
 
 ### Requirement: Draft saved at every step
 Moving to another step, Back, Save & exit and Finish SHALL save the current step's answers. The wizard SHALL show when the draft was last saved, and an incomplete request SHALL always remain savable as a Draft.
