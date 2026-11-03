@@ -140,7 +140,9 @@ describe("find matches and decide", () => {
   it("suggests from an approved estimate, then accepts, adjusts and rejects", async () => {
     const owner = await person();
     const lead = await person("TECH_LEAD");
-    const name = `${word("Orbit")} invoicing`;
+    // Three words, so the random tag can't pull the stub similarity under the threshold (with
+    // two, about 1 run in 70 did: the source's Sub task titles add words the query lacks).
+    const name = `${word("Orbit")} customer invoicing`;
     const source = await request(owner, [
       {
         name,
@@ -419,14 +421,14 @@ describe("Architect references", () => {
     expect(
       (await getDb().notification.findMany({ where: { userId: owner.id } })).map((n) => n.kind),
     ).toContain("REFERENCE_ADDED");
+    // No order in the query, so compare sorted (the rows can come back either way).
     expect(
-      (await getDb().emailMessage.findMany({ where: { requestId: id } })).map((e) => [
-        e.kind,
-        e.to,
-      ]),
+      (await getDb().emailMessage.findMany({ where: { requestId: id } }))
+        .map((e) => [e.kind, e.to])
+        .sort(),
     ).toEqual([
-      ["REFERENCE_REQUESTED", architect.email],
       ["REFERENCE_ADDED", owner.email],
+      ["REFERENCE_REQUESTED", architect.email],
     ]);
 
     // A later request with a similar feature gets it as a match.
