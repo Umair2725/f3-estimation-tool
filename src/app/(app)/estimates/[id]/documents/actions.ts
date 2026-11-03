@@ -12,6 +12,7 @@ import { applyDocument } from "@/server/documents/apply";
 import { removeDocument } from "@/server/documents/files";
 import { readDocumentSoftly, startReading } from "@/server/documents/read";
 import { ServiceError } from "@/server/service-error";
+import { addedMessage, estimateHrefAfterAdding } from "@/lib/documents/added-notice";
 
 // Server actions for requirement documents and client questions (specs/requirement-documents,
 // specs/client-questions). The services re-check the caller.
@@ -43,24 +44,19 @@ export async function removeDocumentAction(documentId: string) {
   });
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
+/** On success, `href` is the Estimate tab with the "Added …" notice (specs/requirement-documents). */
 export async function applyDocumentAction(
   requestId: string,
   documentId: string,
   selection: unknown,
-): Promise<ActionResult> {
-  return run(async () => {
-    const c = await applyDocument(await getCurrentUser(), requestId, documentId, selection);
-    const parts = [
-      plural(c.features, "feature"),
-      plural(c.details, "detail"),
-      plural(c.assumptions, "assumption"),
-      plural(c.risks, "risk"),
-      plural(c.questions, "question"),
-    ];
-    return `Added ${parts.join(", ")} to the request.`;
+): Promise<ActionResult & { href?: string }> {
+  let href: string | undefined;
+  const result = await run(async () => {
+    const counts = await applyDocument(await getCurrentUser(), requestId, documentId, selection);
+    href = estimateHrefAfterAdding(requestId, counts);
+    return addedMessage(counts);
   });
+  return { ...result, href };
 }
 
 export async function addQuestionAction(requestId: string, text: string) {

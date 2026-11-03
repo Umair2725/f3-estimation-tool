@@ -43,6 +43,7 @@ describe("export → parse round trip", () => {
     });
     await saveStep(owner, id, 3, { environments: ["Staging", "Production"] });
     await saveStep(owner, id, 4, {
+      loadedIds: [],
       features: [
         {
           name: "Appointment booking",

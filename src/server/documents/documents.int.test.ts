@@ -68,6 +68,7 @@ async function draft(owner: CurrentUser) {
   });
   await saveStep(owner, id, 3, { hosting: ["Azure"], environments: [], compliance: [] });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: [{ name: "User login", description: "", parts: ["WEB_FRONTEND"] }],
   });
   return id;
@@ -316,6 +317,7 @@ describe("add to request", () => {
           ...r.questions.map((q) => q.id),
         ],
         features: features.map((f) => ({
+          itemIds: f.itemIds,
           name: f.name,
           description: f.description,
           parts: f.parts,
@@ -406,6 +408,22 @@ describe("add to request", () => {
       selected: false,
     });
     expect((await listDocuments(owner, id))[0].addedByName).toBe(owner.name);
+
+    // Renamed in the request it still counts as added; removed, it is offered again.
+    const booking = request.features.find((f) => f.name === "Appointment booking")!;
+    await db.feature.update({ where: { id: booking.id }, data: { name: "Bookings" } });
+    const renamed = (await getDocumentReview(owner, id, docId)).review!;
+    expect(renamed.features.find((f) => f.name === "Appointment booking")).toMatchObject({
+      added: true,
+      removed: false,
+    });
+    await db.feature.delete({ where: { id: booking.id } });
+    const removed = (await getDocumentReview(owner, id, docId)).review!;
+    expect(removed.features.find((f) => f.name === "Appointment booking")).toMatchObject({
+      added: false,
+      removed: true,
+      selected: false,
+    });
   });
 
   it("refuses while the request is in review and changes nothing", async () => {

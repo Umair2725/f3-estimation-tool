@@ -37,6 +37,11 @@ export type WizardProps = {
   initialStep: Step;
   lastStep: Step;
   savedAt: string | null;
+  /**
+   * When the request last changed (its updatedAt, ISO). A newer version than the wizard knows
+   * means it changed elsewhere, such as items added from a document, and the wizard reloads.
+   */
+  version: string | null;
   initial: WizardState;
   technologies: TechnologyOption[];
   clientNames: string[];

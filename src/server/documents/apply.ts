@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 import type { CurrentUser } from "@/server/auth/access";
 import { getDb } from "@/server/db";
 import { canEditRequest, loadForEdit, syncTasks, upsertClient } from "@/server/estimation-requests";
-import { computeSuggestions } from "@/server/matching/matching";
+import { computeSuggestions, fillHours, type FilledHours } from "@/server/matching/matching";
 import { assertAccess, ServiceError } from "@/server/service-error";
 import { effectiveStatus } from "./files";
 
@@ -52,6 +52,7 @@ export async function getDocumentReview(
       addedAt: true,
       proposal: true,
       addedItemIds: true,
+      addedFeatures: true,
     },
   });
   if (!doc) throw new ServiceError("Document not found", 404);
@@ -60,7 +61,7 @@ export async function getDocumentReview(
     include: {
       client: true,
       parts: { include: { technologies: true } },
-      features: { select: { name: true } },
+      features: { select: { id: true, name: true } },
     },
   });
   const stuck = effectiveStatus(doc);
@@ -92,9 +93,11 @@ export async function getDocumentReview(
           technologyIds: p.technologies.map((t) => t.technologyId),
         })),
         featureNames: request.features.map((f) => f.name),
+        featureIds: request.features.map((f) => f.id),
       },
       catalog,
       doc.addedItemIds,
+      readAddedFeatures(doc.addedFeatures),
     );
   }
   return {
@@ -111,6 +114,14 @@ export async function getDocumentReview(
     canEdit: actor ? canEditRequest(actor, request) : false,
     review,
   };
+}
+
+/** The stored item -> feature map; anything unreadable counts as none. */
+function readAddedFeatures(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((e): e is [string, string] => typeof e[1] === "string"),
+  );
 }
 
 const union = <T>(a: readonly T[], b: readonly T[] | undefined) => [
@@ -151,7 +162,13 @@ export async function applyDocument(
     const request = await loadForEdit(tx, actor, requestId);
     const doc = await tx.requestDocument.findFirst({
       where: { id: documentId, requestId },
-      select: { id: true, status: true, addedItemIds: true, fileName: true },
+      select: {
+        id: true,
+        status: true,
+        addedItemIds: true,
+        addedFeatures: true,
+        fileName: true,
+      },
     });
     if (!doc) throw new ServiceError("Document not found", 404);
     if (doc.status !== "READY") throw new ServiceError("This document isn't ready to review", 409);
@@ -245,6 +262,7 @@ export async function applyDocument(
     const last = await tx.feature.aggregate({ where: { requestId }, _max: { position: true } });
     let position = (last._max.position ?? -1) + 1;
     const featureIds: string[] = [];
+    const addedFeatures = readAddedFeatures(doc.addedFeatures);
     for (const f of s.features) {
       const created = await tx.feature.create({
         data: {
@@ -257,6 +275,7 @@ export async function applyDocument(
         select: { id: true },
       });
       featureIds.push(created.id);
+      for (const itemId of f.itemIds) addedFeatures[itemId] = created.id;
     }
 
     // Client questions.
@@ -281,6 +300,7 @@ export async function applyDocument(
       where: { id: documentId },
       data: {
         addedItemIds: union(doc.addedItemIds, s.itemIds),
+        addedFeatures,
         addedAt: new Date(),
         addedById: actor.id,
       },
@@ -307,13 +327,16 @@ export async function applyDocument(
     };
   });
 
-  // New features are matched at once; a failure leaves them added (Find matches still works).
+  // New features are matched and their hours filled in at once: a reliable match's hours, or
+  // else an AI guess. A failure leaves them added without hours (Find matches still works).
+  let hours: FilledHours = { matched: 0, guessed: 0, empty: result.taskIds.length };
   if (result.taskIds.length) {
     try {
       await computeSuggestions(requestId, result.taskIds);
+      hours = await fillHours(actor.id, requestId, result.taskIds);
     } catch (err) {
       logger.error("matching after adding document items failed", { requestId, err });
     }
   }
-  return result.counts;
+  return { ...result.counts, hours };
 }

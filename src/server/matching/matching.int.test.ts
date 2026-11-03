@@ -18,6 +18,7 @@ import {
   CHOOSE_ARCHITECT,
   decideSuggestion,
   declineReference,
+  fillHours,
   findMatches,
   getMatching,
   listReferenceRequests,
@@ -80,6 +81,7 @@ async function request(
   });
   await saveStep(owner, id, 3, { hosting: ["AWS"], environments: ["Production"], compliance: [] });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: features.map((f) => ({ name: f.name, description: "", parts: ["BACKEND"] })),
   });
   const view = await getEstimate(owner, id);
@@ -138,7 +140,9 @@ describe("find matches and decide", () => {
   it("suggests from an approved estimate, then accepts, adjusts and rejects", async () => {
     const owner = await person();
     const lead = await person("TECH_LEAD");
-    const name = `${word("Orbit")} invoicing`;
+    // Three words, so the random tag can't pull the stub similarity under the threshold (with
+    // two, about 1 run in 70 did: the source's Sub task titles add words the query lacks).
+    const name = `${word("Orbit")} customer invoicing`;
     const source = await request(owner, [
       {
         name,
@@ -417,14 +421,14 @@ describe("Architect references", () => {
     expect(
       (await getDb().notification.findMany({ where: { userId: owner.id } })).map((n) => n.kind),
     ).toContain("REFERENCE_ADDED");
+    // No order in the query, so compare sorted (the rows can come back either way).
     expect(
-      (await getDb().emailMessage.findMany({ where: { requestId: id } })).map((e) => [
-        e.kind,
-        e.to,
-      ]),
+      (await getDb().emailMessage.findMany({ where: { requestId: id } }))
+        .map((e) => [e.kind, e.to])
+        .sort(),
     ).toEqual([
-      ["REFERENCE_REQUESTED", architect.email],
       ["REFERENCE_ADDED", owner.email],
+      ["REFERENCE_REQUESTED", architect.email],
     ]);
 
     // A later request with a similar feature gets it as a match.
@@ -513,5 +517,84 @@ describe("AI guess", () => {
       summary: "1 Task uses an AI guess",
       items: [{ taskId: task.taskId }],
     });
+  });
+});
+
+describe("hours filled in at once (specs/requirement-documents)", () => {
+  it("uses a reliable match's hours, else an AI guess, recorded as accepted", async () => {
+    const owner = await person();
+    const lead = await person("TECH_LEAD");
+    const matched = `${word("Orchid")} invoicing`;
+    const source = await request(owner, [
+      { name: matched, subTasks: [{ title: "Invoice API", min: 6, max: 9 }] },
+    ]);
+    await approved(owner, lead, source);
+
+    const unmatched = `${word("Zephyr")} telemetry`;
+    const failing = `${word("Basalt")} payroll`;
+    const kept = `${word("Cobalt")} audit`;
+    const id = await request(owner, [
+      { name: matched },
+      { name: unmatched },
+      { name: failing },
+      { name: kept, subTasks: [{ title: "Typed by hand", min: 1, max: 2 }] },
+    ]);
+    setGuessClientForTests(async (input) => {
+      if (input.featureName === failing) throw new Error("model unavailable");
+      return { subTasks: [{ title: "Telemetry pipeline", minHours: 5, maxHours: 7 }] };
+    });
+    await findMatches(owner, id);
+    const tasks = (await getEstimate(owner, id)).parts[0].tasks;
+    const filled = await fillHours(
+      owner.id,
+      id,
+      tasks.map((t) => t.taskId),
+    );
+    expect(filled).toEqual({ matched: 1, guessed: 1, empty: 1 });
+
+    const view = await getEstimate(owner, id);
+    const matching = await getMatching(owner, id);
+    const task = (name: string) => view.parts[0].tasks.find((t) => t.featureName === name)!;
+    const suggestion = (name: string) => matching.byTask[task(name).taskId].suggestion!;
+
+    expect(task(matched).subTasks).toMatchObject([
+      { title: "Invoice API", min: 6, max: 9, comment: expect.stringContaining("From ") },
+    ]);
+    expect(suggestion(matched)).toMatchObject({ decision: "ACCEPTED", decidedByName: owner.name });
+
+    expect(task(unmatched).subTasks).toMatchObject([
+      { title: "Telemetry pipeline", min: 5, max: 7 },
+    ]);
+    expect(task(unmatched).subTasks[0].comment).toBe("AI-generated, no historical reference");
+    expect(suggestion(unmatched)).toMatchObject({ method: "AI_GUESS", decision: "ACCEPTED" });
+
+    // A failed guess leaves the Task as "No reliable match" without hours.
+    expect(task(failing).subTasks).toEqual([]);
+    expect(suggestion(failing)).toMatchObject({ method: "NO_MATCH", decision: "PENDING" });
+
+    // Hours already there are never replaced.
+    expect(task(kept).subTasks).toMatchObject([{ title: "Typed by hand", min: 1, max: 2 }]);
+    expect(suggestion(kept).decision).toBe("PENDING");
+
+    // The estimator can still reject a filled-in suggestion.
+    await decideSuggestion(owner, id, task(unmatched).taskId, { decision: "REJECTED" });
+    expect((await getMatching(owner, id)).byTask[task(unmatched).taskId].suggestion).toMatchObject({
+      decision: "REJECTED",
+    });
+  });
+
+  it("leaves Tasks without a match empty when AI guesses aren't set up", async () => {
+    const owner = await person();
+    const name = `${word("Quartz")} kiosk`;
+    const id = await request(owner, [{ name }]);
+    setGuessClientForTests(null);
+    await findMatches(owner, id);
+    const [task] = (await getEstimate(owner, id)).parts[0].tasks;
+    expect(await fillHours(owner.id, id, [task.taskId])).toEqual({
+      matched: 0,
+      guessed: 0,
+      empty: 1,
+    });
+    expect((await getEstimate(owner, id)).parts[0].tasks[0].subTasks).toEqual([]);
   });
 });

@@ -221,6 +221,23 @@ async function architectChoices() {
 
 // ---------- decisions ----------
 
+/** Replaces a Task's Sub tasks with a suggestion's, each keeping its source comment. */
+async function replaceSubTasks(tx: Tx, taskId: string, suggested: SuggestedSubTask[]) {
+  await tx.subTask.deleteMany({ where: { taskId } });
+  await tx.subTask.createMany({
+    data: suggested.map((s, position) => ({
+      taskId,
+      title: s.title.slice(0, 200),
+      minTenths: s.minTenths,
+      maxTenths: s.maxTenths,
+      comment: s.comment.slice(0, 1000),
+      // Kept so actual hours can flow back to the benchmark (specs/feature-matching).
+      benchmarkId: s.benchmarkId ?? null,
+      position,
+    })),
+  });
+}
+
 export async function decideSuggestion(
   actor: CurrentUser | null,
   requestId: string,
@@ -244,19 +261,7 @@ export async function decideSuggestion(
     const suggested = suggestion.suggested as unknown as SuggestedSubTask[] | null;
     if (decision !== "REJECTED") {
       if (!suggested?.length) throw new ServiceError(NOTHING_TO_ACCEPT, 400);
-      await tx.subTask.deleteMany({ where: { taskId } });
-      await tx.subTask.createMany({
-        data: suggested.map((s, position) => ({
-          taskId,
-          title: s.title.slice(0, 200),
-          minTenths: s.minTenths,
-          maxTenths: s.maxTenths,
-          comment: s.comment.slice(0, 1000),
-          // Kept so actual hours can flow back to the benchmark (specs/feature-matching).
-          benchmarkId: s.benchmarkId ?? null,
-          position,
-        })),
-      });
+      await replaceSubTasks(tx, taskId, suggested);
     }
     await tx.taskSuggestion.update({
       where: { id: suggestion.id },
@@ -280,31 +285,120 @@ export async function requestAiGuess(actor: CurrentUser | null, requestId: strin
   }
   let subTasks: SuggestedSubTask[];
   try {
-    const result = await guess({
-      applicationTypes: request.applicationTypes,
-      partLabel: task.partLabel,
-      featureName: task.featureName,
-      featureDescription: task.featureDescription,
-      compliance: readConsiderations(request.considerations).compliance,
-    });
-    subTasks = guessToSubTasks(result, AI_GUESS_NOTE);
+    subTasks = await guessSubTasks(request, task);
   } catch (err) {
     logger.warn("AI guess failed", { requestId, taskId, err });
     throw new ServiceError(GUESS_FAILED, 400);
   }
-  await db.taskSuggestion.update({
-    where: { taskId },
-    data: {
-      method: "AI_GUESS",
-      suggested: subTasks as unknown as Prisma.InputJsonValue,
-      suggestedMinTenths: subTasks.reduce((n, s) => n + s.minTenths, 0),
-      suggestedMaxTenths: subTasks.reduce((n, s) => n + s.maxTenths, 0),
-      decision: "PENDING",
-      reason: null,
-      decidedById: null,
-      decidedAt: null,
-    },
+  await db.taskSuggestion.update({ where: { taskId }, data: aiGuessData(subTasks) });
+}
+
+type GuessRequest = { applicationTypes: string[]; considerations: Prisma.JsonValue };
+
+/** The AI-only guess for one Task; only this request's own details are sent. */
+async function guessSubTasks(request: GuessRequest, task: TaskContext) {
+  const result = await guess({
+    applicationTypes: request.applicationTypes,
+    partLabel: task.partLabel,
+    featureName: task.featureName,
+    featureDescription: task.featureDescription,
+    compliance: readConsiderations(request.considerations).compliance,
   });
+  return guessToSubTasks(result, AI_GUESS_NOTE);
+}
+
+function aiGuessData(subTasks: SuggestedSubTask[]) {
+  return {
+    method: "AI_GUESS" as const,
+    suggested: subTasks as unknown as Prisma.InputJsonValue,
+    suggestedMinTenths: subTasks.reduce((n, s) => n + s.minTenths, 0),
+    suggestedMaxTenths: subTasks.reduce((n, s) => n + s.maxTenths, 0),
+    decision: "PENDING" as const,
+    reason: null,
+    decidedById: null,
+    decidedAt: null,
+  };
+}
+
+// ---------- hours filled in at once ----------
+
+/** How many AI guesses run at the same time when filling hours. */
+const GUESS_CONCURRENCY = 4;
+
+export type FilledHours = { matched: number; guessed: number; empty: number };
+
+/**
+ * Fills the hours of new Tasks at once (specs/requirement-documents "Hours filled in"): the
+ * suggestion's Sub tasks when there is a reliable match, otherwise an AI guess when AI guesses
+ * are set up. Each fill is recorded as accepted by `actorId`, and stays open to Adjust or
+ * Reject. Tasks that already have Sub tasks are left alone. Run after computeSuggestions; no
+ * permission check (callers check). A failed guess leaves the Task empty, as "No reliable match".
+ */
+export async function fillHours(
+  actorId: string,
+  requestId: string,
+  taskIds: string[],
+): Promise<FilledHours> {
+  const db = getDb();
+  const filled: FilledHours = { matched: 0, guessed: 0, empty: 0 };
+  if (taskIds.length === 0) return filled;
+  const [request, suggestions, withSubTasks] = await Promise.all([
+    db.estimationRequest.findUniqueOrThrow({
+      where: { id: requestId },
+      select: { applicationTypes: true, considerations: true },
+    }),
+    db.taskSuggestion.findMany({ where: { taskId: { in: taskIds } } }),
+    db.subTask.findMany({
+      where: { taskId: { in: taskIds } },
+      select: { taskId: true },
+      distinct: ["taskId"],
+    }),
+  ]);
+  const hasHours = new Set(withSubTasks.map((s) => s.taskId));
+  const byTask = new Map(suggestions.map((s) => [s.taskId, s]));
+  const open = taskIds.filter((id) => !hasHours.has(id));
+
+  const accept = async (taskId: string, subTasks: SuggestedSubTask[], data = {}) => {
+    await db.$transaction(async (tx) => {
+      await replaceSubTasks(tx, taskId, subTasks);
+      await tx.taskSuggestion.update({
+        where: { taskId },
+        data: { ...data, decision: "ACCEPTED", decidedById: actorId, decidedAt: new Date() },
+      });
+    });
+  };
+
+  const toGuess: string[] = [];
+  for (const taskId of open) {
+    const suggestion = byTask.get(taskId);
+    const suggested = suggestion?.suggested as unknown as SuggestedSubTask[] | null | undefined;
+    if (suggested?.length) {
+      await accept(taskId, suggested);
+      filled.matched++;
+    } else if (suggestion && aiGuessesEnabled()) toGuess.push(taskId);
+    else filled.empty++;
+  }
+
+  if (toGuess.length) {
+    const tasks = new Map((await loadTasks(db, requestId, toGuess)).map((t) => [t.taskId, t]));
+    const queue = [...toGuess];
+    const worker = async () => {
+      for (let taskId = queue.shift(); taskId; taskId = queue.shift()) {
+        const task = tasks.get(taskId);
+        try {
+          if (!task) throw new Error("Task not found");
+          const subTasks = await guessSubTasks(request, task);
+          await accept(taskId, subTasks, aiGuessData(subTasks));
+          filled.guessed++;
+        } catch (err) {
+          logger.warn("AI guess while filling hours failed", { requestId, taskId, err });
+          filled.empty++;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(GUESS_CONCURRENCY, toGuess.length) }, worker));
+  }
+  return filled;
 }
 
 // ---------- Architect references ----------

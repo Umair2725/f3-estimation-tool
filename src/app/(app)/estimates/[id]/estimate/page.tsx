@@ -7,12 +7,18 @@ import { getMatching } from "@/server/matching/matching";
 import { getReviewPanel, listComments } from "@/server/review";
 import { FindAllMatches } from "./find-all-matches";
 import { ServiceError } from "@/server/service-error";
+import { addedMessage, readAddedCounts } from "@/lib/documents/added-notice";
+import { AddedNotice } from "./added-notice";
 import { EstimateEditor } from "./estimate-editor";
 
 export const metadata: Metadata = { title: "Estimate hours · F3 Estimation Tool" };
 
-export default async function EstimatePage({ params }: PageProps<"/estimates/[id]/estimate">) {
+export default async function EstimatePage({
+  params,
+  searchParams,
+}: PageProps<"/estimates/[id]/estimate">) {
   const { id } = await params;
+  const { notice, added } = await searchParams;
   const user = await requireRole(`/estimates/${id}/estimate`);
   if (!user) return null; // the layout shows the waiting page
   const view = await getEstimate(user, id).catch((err) => {
@@ -25,6 +31,7 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
     getMatching(user, id),
   ]);
   // Remount the editor when an accepted suggestion replaced Sub tasks on the server.
+  const counts = readAddedCounts(notice, added);
   const decided = Object.values(matching.byTask)
     .map((t) => t.suggestion?.decidedAt?.getTime() ?? 0)
     .reduce((a, b) => Math.max(a, b), 0);
@@ -60,6 +67,7 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
           </p>
         )}
       </div>
+      <AddedNotice requestId={id} message={counts ? addedMessage(counts) : null} />
       <EstimateEditor
         key={`${id}:${decided}`}
         view={view}

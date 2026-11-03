@@ -9,7 +9,14 @@ import type { MissingItem } from "@/lib/estimation/completeness";
 import type { Step } from "@/lib/estimation/options";
 
 export type SaveResult =
-  | { ok: true; id: string; savedAt: string; missing: MissingItem[] }
+  | {
+      ok: true;
+      id: string;
+      savedAt: string;
+      missing: MissingItem[];
+      /** Step 4 only: the saved feature ids, in the order the form sent them. */
+      featureIds?: string[];
+    }
   | { ok: false; message: string; fields: Record<string, string> };
 
 function refused(err: unknown): SaveResult {
@@ -32,9 +39,9 @@ export async function createRequestAction(input: unknown): Promise<SaveResult> {
 export async function saveStepAction(id: string, step: Step, input: unknown): Promise<SaveResult> {
   try {
     const actor = await getCurrentUser();
-    const { savedAt } = await saveStep(actor, id, step, input);
+    const { savedAt, featureIds } = await saveStep(actor, id, step, input);
     const { missing } = await getRequest(actor, id);
-    return { ok: true, id, savedAt: savedAt.toISOString(), missing };
+    return { ok: true, id, savedAt: savedAt.toISOString(), missing, featureIds };
   } catch (err) {
     return refused(err);
   }

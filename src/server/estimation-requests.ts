@@ -116,11 +116,14 @@ export async function saveStep(actor: CurrentUser | null, id: string, step: Step
         where: { id },
         data: { considerations: parse(step3Schema, input) },
       });
-    } else await saveFeatures(tx, request, input);
+    }
+    // Step 4 returns the saved feature ids in form order, so the form can send them next time.
+    const featureIds = step === 4 ? await saveFeatures(tx, request, input) : undefined;
     if (step === 2 || step === 4) await syncTasks(tx, id);
 
+    // This update comes last, so savedAt is the request's updatedAt after the save.
     const saved = await tx.estimationRequest.update({ where: { id }, data: { lastStep: step } });
-    return { savedAt: saved.updatedAt };
+    return { savedAt: saved.updatedAt, featureIds };
   });
 }
 
@@ -200,8 +203,8 @@ async function savePlatforms(tx: Tx, request: LoadedRequest, input: unknown) {
   });
 }
 
-async function saveFeatures(tx: Tx, request: LoadedRequest, input: unknown) {
-  const { features } = parse(step4Schema, input);
+async function saveFeatures(tx: Tx, request: LoadedRequest, input: unknown): Promise<string[]> {
+  const { features, loadedIds } = parse(step4Schema, input);
   const allowed = new Set<Part>(request.parts.map((p) => p.part));
   features.forEach((feature, i) => {
     if (feature.parts.some((p) => !allowed.has(p))) {
@@ -213,17 +216,36 @@ async function saveFeatures(tx: Tx, request: LoadedRequest, input: unknown) {
   // Update features by id, so their estimate Tasks and Sub tasks survive renames and reorders.
   const existing = new Set(request.features.map((f) => f.id));
   const kept = new Set<string>();
+  const ids: string[] = [];
   for (const [position, f] of features.entries()) {
     const data = { name: f.name, description: f.description || null, parts: f.parts, position };
     if (f.key && existing.has(f.key) && !kept.has(f.key)) {
       kept.add(f.key);
+      ids.push(f.key);
       await tx.feature.update({ where: { id: f.key }, data });
     } else {
       const created = await tx.feature.create({ data: { ...data, requestId: request.id } });
       kept.add(created.id);
+      ids.push(created.id);
     }
   }
-  await tx.feature.deleteMany({ where: { requestId: request.id, id: { notIn: [...kept] } } });
+  // Remove only what the person removed in this form: features it loaded but didn't send back.
+  // A feature added elsewhere after the form loaded (from a document, in another tab) is kept,
+  // after the submitted ones in its current order.
+  const loaded = new Set(loadedIds);
+  const removed = request.features.filter((f) => loaded.has(f.id) && !kept.has(f.id));
+  if (removed.length) {
+    await tx.feature.deleteMany({ where: { id: { in: removed.map((f) => f.id) } } });
+  }
+  const others = request.features
+    .filter((f) => !loaded.has(f.id) && !kept.has(f.id))
+    .sort((a, b) => a.position - b.position);
+  for (const [i, f] of others.entries()) {
+    const position = features.length + i;
+    if (f.position !== position)
+      await tx.feature.update({ where: { id: f.id }, data: { position } });
+  }
+  return ids;
 }
 
 /**

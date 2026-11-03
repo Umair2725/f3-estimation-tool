@@ -7,6 +7,7 @@ import type { MissingItem } from "@/lib/estimation/completeness";
 import { STEPS, type Step } from "@/lib/estimation/options";
 import { savedAgoLabel } from "@/lib/relative-time";
 import { createRequestAction, saveStepAction, type SaveResult } from "../actions";
+import { isNewer, reloadState, withSavedIds } from "./reload";
 import { Step1, Step2, Step3, Step4 } from "./steps";
 import { RequestSummary } from "./summary";
 import type { Errors, WizardProps, WizardState } from "./types";
@@ -14,6 +15,10 @@ import type { Errors, WizardProps, WizardState } from "./types";
 // The four-step wizard (specs/estimation-requests, approved design screen 3). Every move
 // (Next, Back, stepper, Save & exit, Finish) saves the current step first; a failed save keeps
 // the person on the step with the errors shown.
+//
+// Next.js keeps this page mounted (hidden) while the person is elsewhere, so the wizard can hold
+// an old copy of the request. When the page brings a newer version (changed elsewhere, such as
+// items added from a document) the wizard reloads, keeping unsaved values on the current step.
 
 type Destination = { kind: "step"; step: Step } | { kind: "exit" } | { kind: "finish" };
 
@@ -26,12 +31,24 @@ export function Wizard(props: WizardProps) {
   const [state, setState] = useState<WizardState>(props.initial);
   const [saved, setSaved] = useState<WizardState>(props.initial);
   const [savedAt, setSavedAt] = useState<string | null>(props.savedAt);
+  const [knownVersion, setKnownVersion] = useState<string | null>(props.version);
+  const [reloaded, setReloaded] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [missing, setMissing] = useState<MissingItem[]>([]);
   const [pending, startTransition] = useTransition();
   const [now, setNow] = useState(() => new Date());
   const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Adjusting state while rendering (React's pattern for "props changed"), so the stale copy
+  // is never shown.
+  if (isNewer(props.version, knownVersion)) {
+    setKnownVersion(props.version);
+    setState(reloadState(state, saved, props.initial, step));
+    setSaved(props.initial);
+    setSavedAt(props.version);
+    setReloaded(true);
+  }
 
   const dirty = JSON.stringify(state[step]) !== JSON.stringify(saved[step]);
 
@@ -54,7 +71,11 @@ export function Wizard(props: WizardProps) {
   }
 
   async function save(): Promise<SaveResult> {
-    const payload = step === 4 ? { features: state[4].features } : state[step];
+    // Step 4 also sends the features it loaded: only those can be removed by this save.
+    const payload =
+      step === 4
+        ? { features: state[4].features, loadedIds: saved[4].features.map((f) => f.key) }
+        : state[step];
     if (!props.id) return createRequestAction(payload);
     return saveStepAction(props.id, step, payload);
   }
@@ -62,6 +83,7 @@ export function Wizard(props: WizardProps) {
   function go(destination: Destination) {
     startTransition(async () => {
       setMessage(null);
+      setReloaded(false);
       const result = await save();
       if (!result.ok) {
         setErrors(result.fields);
@@ -69,8 +91,12 @@ export function Wizard(props: WizardProps) {
         return;
       }
       setErrors({});
-      setSaved((prev) => ({ ...prev, [step]: state[step] }));
+      // New features get their saved ids, so the next save updates them instead of adding them.
+      const done = step === 4 ? withSavedIds(state, result.featureIds) : state;
+      if (done !== state) setState(done);
+      setSaved((prev) => ({ ...prev, [step]: done[step] }));
       setSavedAt(result.savedAt);
+      setKnownVersion(result.savedAt);
       setNow(new Date());
 
       if (destination.kind === "exit") {
@@ -118,6 +144,11 @@ export function Wizard(props: WizardProps) {
         />
 
         <div aria-live="polite" className="flex flex-col gap-3 empty:hidden">
+          {reloaded && (
+            <p role="status" className="rounded-lg bg-info-bg px-3.5 py-3 text-sm text-info">
+              Updated with changes made elsewhere.
+            </p>
+          )}
           {message && (
             <p role="alert" className="rounded-lg bg-err-bg px-3.5 py-3 text-sm text-err">
               {message}

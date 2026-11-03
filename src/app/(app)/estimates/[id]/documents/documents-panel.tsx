@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { ui } from "@/components/ui";
 import { readAgainAction, removeDocumentAction, type ActionResult } from "./actions";
 
@@ -77,6 +77,16 @@ export function DocumentsPanel(props: {
   const [confirming, setConfirming] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const reading = props.documents.some((d) => d.status === "READING");
+
+  // Next.js keeps this page mounted while the person is elsewhere; drop the last action's
+  // message and any open confirmation when it's hidden, so they don't come back stale.
+  useLayoutEffect(
+    () => () => {
+      setNotice(null);
+      setConfirming(null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!reading) return;

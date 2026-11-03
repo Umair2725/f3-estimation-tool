@@ -52,7 +52,10 @@ async function requestWithScope(owner: CurrentUser) {
     environments: ["Staging", "Production"],
     appStores: ["Google Play"],
   });
-  await saveStep(owner, id, 4, { features: [{ name: "Booking", parts: ["BACKEND", "MOBILE"] }] });
+  await saveStep(owner, id, 4, {
+    loadedIds: [],
+    features: [{ name: "Booking", parts: ["BACKEND", "MOBILE"] }],
+  });
   return id;
 }
 
