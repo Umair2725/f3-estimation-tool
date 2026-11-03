@@ -58,7 +58,7 @@
   - Found: **Quote checked**.
   - Page has no text layer, or the quote isn't found: **Check the page**, with a link that opens the PDF at that page (`#page=N`).
 - **The request:**
-  - `client.beta.messages.stream` with `output_config: { format: zodOutputFormat(ProposalSchema) }`, `max_tokens: 32000`, the same fallback beta and model setting as AI guesses
+  - `client.beta.messages.stream` with `output_config: { format: zodOutputFormat(WireSchema) }`, `max_tokens: 32000`, the same fallback beta and model setting as AI guesses
   - `finalMessage()`, then parse with zod; streaming avoids HTTP timeouts on long documents
   - a `refusal` or `max_tokens` stop, or a schema mismatch, fails the document with a readable reason
 - **What Claude receives:**
@@ -66,6 +66,7 @@
   - the active catalog technologies per part, the allowed values for every detail field, and the request's existing feature names, so it doesn't propose them twice
   - instructions to leave out anything the document doesn't say, to set `needsConfirmation` when unsure, and to put a technology that isn't in the catalog in the part's `note`
 - **`ProposalSchema`** (pure, in `src/lib/documents/proposal.ts`): `features[]`, `details` (one optional entry per field, each with values, cite and confidence), `assumptions[]`, `risks[]`, `questions[]`. Every item has an `id` generated after parsing, so the review and `addedItemIds` can refer to it.
+- **`WireSchema`** (pure, in `src/lib/documents/wire.ts`): what Claude actually returns. The API compiles the output schema into a grammar with a size limit and rejected the full `ProposalSchema` as "too large". So the wire schema is flat: lists instead of optional objects, no nullable fields and no length limits (page `0` for a Word document, section `""` for a PDF). `fromWire` converts it, trimming text, dropping items without a quote and values the tool doesn't allow, and then validates the result with `ProposalSchema`.
 - **Alternative considered:** two passes (citations first, then structuring). Twice the cost and time, and the quote check above gives the estimator the same assurance.
 
 ### 3. Reading in the background

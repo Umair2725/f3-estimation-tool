@@ -34,7 +34,9 @@
 ## 5. Verification
 
 - [x] 5.1 Run lint, typecheck, Prettier, unit, integration, e2e and the build, all green.
-- [ ] 5.2 On UAT with the real Anthropic key: upload a fictional 10–20 page RFP PDF (and a scanned page) and a Folio3-style SOW DOCX. Check that reading finishes in under 2 minutes, that cites point to the right pages, and that quotes are checked on text pages and show "Check the page" on the scan. Record the results in the PR.
+- [x] 5.2 On UAT with the real Anthropic key: upload a fictional 10–20 page RFP PDF (and a scanned page) and a Folio3-style SOW DOCX. Check that reading finishes in under 2 minutes, that cites point to the right pages, and that quotes are checked on text pages and show "Check the page" on the scan. Record the results in the PR.
+  - The first real read showed the API rejects the full schema as "too large"; Claude now answers in a flat `WireSchema` that `fromWire` converts (design §2).
+  - 2026-11-03, `claude-opus-5-5`: the 12-page RFP read in 34 s (9 features, 13 details, 2 assumptions, 3 risks, 8 questions; 32 of 34 quotes checked, the 2 on scanned page 9 show "Check the page"). The 3-section SOW read in 13 s (4 features, 13 of 13 quotes checked).
 - [ ] 5.3 Open a PR. Verify CI is green on the PR.
 
 ## Workflow follow-up
