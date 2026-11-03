@@ -31,6 +31,7 @@ describe("validateEnv: database and basics", () => {
         AUTH_DEV_LOGIN: "0",
         EMBEDDINGS_PROVIDER: "local",
         EMBEDDINGS_CACHE_DIR: undefined,
+        DOCUMENT_READER: "claude",
         ANTHROPIC_API_KEY: undefined,
         ANTHROPIC_MODEL: undefined,
         SMTP_HOST: undefined,
@@ -217,5 +218,21 @@ describe("validateEnv: email", () => {
     const problems = problemsOf({ ...base, ...smtp, SMTP_PORT: "abc", MAIL_FROM: "nope" });
     expect(problems.map((p) => p.name).sort()).toEqual(["MAIL_FROM", "SMTP_PORT"]);
     expect(formatProblems(problems)).not.toContain("app-pass-s3cret");
+  });
+});
+
+describe("validateEnv: document reader", () => {
+  it("defaults to Claude, accepts the stub outside production and refuses unknown readers", () => {
+    expect(
+      validateEnv(base).ok &&
+        (validateEnv(base) as { env: { DOCUMENT_READER: string } }).env.DOCUMENT_READER,
+    ).toBe("claude");
+    expect(validateEnv({ ...base, DOCUMENT_READER: "stub" }).ok).toBe(true);
+    expect(problemsOf({ ...base, DOCUMENT_READER: "ocr" }).map((p) => p.name)).toEqual([
+      "DOCUMENT_READER",
+    ]);
+    expect(
+      problemsOf({ ...base, NODE_ENV: "production", DOCUMENT_READER: "stub" }).map((p) => p.name),
+    ).toEqual(["DOCUMENT_READER"]);
   });
 });

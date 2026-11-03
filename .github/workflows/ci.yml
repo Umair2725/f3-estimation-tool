@@ -36,6 +36,7 @@ jobs:
       AUTH_DEV_LOGIN: "1"
       ADMIN_EMAILS: dev.admin@folio3.com
       EMBEDDINGS_PROVIDER: stub
+      DOCUMENT_READER: stub
 
     steps:
       - uses: actions/checkout@v5

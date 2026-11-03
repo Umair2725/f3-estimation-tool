@@ -45,6 +45,8 @@ export default defineConfig({
       // Never real email or AI calls from e2e runs, even with these set in .env.
       SMTP_HOST: "",
       ANTHROPIC_API_KEY: "",
+      // A test-only reader for requirement documents (specs/requirement-documents).
+      DOCUMENT_READER: "stub",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

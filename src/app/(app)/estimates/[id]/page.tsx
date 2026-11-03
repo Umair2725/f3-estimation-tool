@@ -16,6 +16,10 @@ import { OutcomeControls } from "./outcome-controls";
 import { ReviewCard } from "./review-card";
 import { historyLabel, reviewStatusLine } from "@/lib/review/labels";
 import { getReviewPanel, markRequestRead } from "@/server/review";
+import { listClientQuestions } from "@/server/client-questions";
+import { listDocuments } from "@/server/documents/files";
+import { DocumentsPanel } from "./documents/documents-panel";
+import { QuestionsCard } from "./documents/questions-card";
 
 export const metadata: Metadata = { title: "Estimation request · F3 Estimation Tool" };
 
@@ -28,9 +32,11 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
     if (err instanceof ServiceError && err.status === 404) notFound();
     throw err;
   });
-  const [actualTotals, review] = await Promise.all([
+  const [actualTotals, review, documents, questions] = await Promise.all([
     latestActualTotals([request.id]),
     getReviewPanel(user, id),
+    listDocuments(user, id),
+    listClientQuestions(user, id),
     markRequestRead(user, id),
   ]);
   const actualTotal = actualTotals.get(request.id);
@@ -342,6 +348,17 @@ export default async function RequestPage({ params, searchParams }: PageProps<"/
             )}
           </div>
         </section>
+
+        <DocumentsPanel
+          requestId={request.id}
+          canEdit={request.canEdit}
+          documents={documents.map((d) => ({ ...d, addedAt: d.addedAt?.toISOString() ?? null }))}
+        />
+        <QuestionsCard
+          requestId={request.id}
+          questions={questions.questions}
+          canEdit={questions.canEdit}
+        />
       </div>
     </div>
   );

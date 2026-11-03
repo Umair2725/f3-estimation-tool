@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
     ],
   },
   partialPrefetching: true,
+  experimental: {
+    // The proxy buffers request bodies; requirement documents can be up to 25 MB
+    // (specs/requirement-documents), so allow a little more than that.
+    proxyClientMaxBodySize: "26mb",
+  },
   turbopack: {
     rules: {
       "*.css": {

@@ -203,19 +203,21 @@ model EstimationRequest {
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
-  parts          RequestPart[]
-  features       Feature[]
-  exports        ExportRecord[]
-  actuals        ActualsVersion[]
-  actualsUploads ActualsUpload[]
-  importedFrom   ImportedProject[]
-  statusChanges  StatusChange[]
-  comments       ReviewComment[]
-  approved       ApprovedVersion[]
-  notifications  Notification[]
-  knowledge      KnowledgeItem[]
-  referenceAsks  ReferenceRequest[]
-  observations   BenchmarkObservation[]
+  parts           RequestPart[]
+  features        Feature[]
+  exports         ExportRecord[]
+  actuals         ActualsVersion[]
+  actualsUploads  ActualsUpload[]
+  importedFrom    ImportedProject[]
+  statusChanges   StatusChange[]
+  comments        ReviewComment[]
+  approved        ApprovedVersion[]
+  notifications   Notification[]
+  knowledge       KnowledgeItem[]
+  referenceAsks   ReferenceRequest[]
+  observations    BenchmarkObservation[]
+  documents       RequestDocument[]
+  clientQuestions ClientQuestion[]
 
   @@index([updatedAt(sort: Desc)])
   @@index([reviewerId, status])
@@ -881,4 +883,67 @@ model EmailMessage {
 
   @@index([status, createdAt])
   @@map("email_message")
+}
+
+// Requirement documents (specs/requirement-documents): the file itself, its text layer for quote
+// checks, and Claude's proposal. Deleted with the request. People are referenced by id only.
+enum DocumentKind {
+  CLIENT_REQUIREMENTS
+  FOLIO3_SOW
+}
+
+enum DocumentFormat {
+  PDF
+  DOCX
+}
+
+enum DocumentStatus {
+  READING
+  READY
+  FAILED
+  NOT_SET_UP
+}
+
+model RequestDocument {
+  id            String            @id @default(uuid())
+  requestId     String            @map("request_id")
+  request       EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName      String            @map("file_name")
+  kind          DocumentKind
+  format        DocumentFormat
+  bytes         Bytes
+  sizeBytes     Int               @map("size_bytes")
+  fingerprint   String
+  pageCount     Int               @map("page_count")
+  textLayer     Json              @map("text_layer")
+  status        DocumentStatus
+  error         String?
+  readStartedAt DateTime?         @map("read_started_at")
+  readAt        DateTime?         @map("read_at")
+  model         String?
+  proposal      Json?
+  addedItemIds  String[]          @map("added_item_ids")
+  addedAt       DateTime?         @map("added_at")
+  addedById     String?           @map("added_by_id")
+  uploadedById  String            @map("uploaded_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("request_document")
+}
+
+// Questions for the client (specs/client-questions). source is null when typed in.
+model ClientQuestion {
+  id          String            @id @default(uuid())
+  requestId   String            @map("request_id")
+  request     EstimationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  text        String
+  position    Int
+  source      Json?
+  createdById String            @map("created_by_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([requestId, position])
+  @@map("client_question")
 }

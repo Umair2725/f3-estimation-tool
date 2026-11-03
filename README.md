@@ -94,6 +94,7 @@ npm.cmd run check-env
 | `ADMIN_EMAILS` | no | – | Comma-separated `@folio3.com` emails that become Admin on first sign-in |
 | `AUTH_DEV_LOGIN` | no | `0` | `1` turns on development sign-in. **Refused when `NODE_ENV=production`** |
 | `DEV_USER_PASSWORD` | no | example value | Password of the seeded development users |
+| `DOCUMENT_READER` | no | `claude` | Who reads requirement documents: `claude` (needs `ANTHROPIC_API_KEY`) or `stub`, a test-only reader refused in production |
 | `SMTP_HOST` | no | – | Mail server. Empty = no email is sent (see [Email](#email)) |
 | `SMTP_PORT`, `SMTP_SECURE` | no | `465`, TLS on 465 | Port, and `true` for TLS from the start or `false` for STARTTLS |
 | `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | when `SMTP_HOST` is set | – | Mail account, its (app) password, and the sender address |
@@ -173,7 +174,7 @@ Shows whether email is set up (never the password), **Send test email**, and the
    - **Project:** name, client, project manager, date
    - **Platforms & stack:** application types, operating systems, browsers, and the parts with their technologies
    - **Environment & compliance:** hosting, environments, app stores, compliance and non-functional needs
-   - **Requirements:** the feature list (document upload comes later)
+   - **Requirements:** the feature list, and requirement documents (see [Requirement documents](#requirement-documents))
 3. Every step is saved as a **Draft** when you move on, go back or click **Save & exit**. **Continue where you left off** on Home reopens your latest draft at the step you last saved.
 4. **Finish** checks that the request has a client, at least one part with a technology, and at least one feature, then opens the request page.
 
@@ -186,6 +187,26 @@ Who can do what:
 - retire old ones: they disappear from the wizard, but requests that already use them keep them
 
 The catalog starts with the technologies from the product brief.
+
+## Requirement documents
+
+On the **Requirements** step, upload the client's RFP or specification (**PDF**) or a Folio3 SOW (**Word .docx**), up to 25 MB each, and say which it is. Files are checked by their content, not their name. Everyone who can see the request can download them; only the owner or an Admin can upload, remove or add from them.
+
+1. **Claude reads each document** in the background, usually within 2 minutes. PDFs go to Claude as documents, so scanned pages are read too; Word files are converted to text first. Without `ANTHROPIC_API_KEY`, upload still works and the document says AI reading isn't set up.
+2. When it says **Ready to review**, click **Review**. Claude proposes:
+   - features, with a description and the parts they need
+   - request details for steps 1–3: project name, client, platforms, browsers, technologies from the catalog, hosting, environments, app stores, compliance and non-functional needs
+   - assumptions and risks per part, and **questions for the client**
+3. Every item shows its **document, page (or Word section) and quote**:
+   - **Quote checked**: the quote was found in the file's own text
+   - **Check the page**: a scanned page or a quote that wasn't found; the link opens the PDF at that page
+   - **Needs confirmation**: Claude wasn't sure
+4. Tick what to keep and edit anything. You can **merge** ticked features (keeping all their sources), **split** one, or delete one. A feature already in the request is flagged and unticked, and so is a detail that would change something you filled in.
+5. **Add to request** adds only what's ticked, in one save. New features get estimate Tasks and are matched straight away. A technology the catalog doesn't have is noted under step 3's other considerations.
+
+Nothing changes until you click **Add to request**. You can review a document again later; items already added show as **Added**. **Questions for the client** appear on the request page, where you can also type your own; they aren't in the Excel export yet.
+
+Documents are stored in the database with their request (deleting a request deletes them) and are sent only to Claude for reading. Their text is never logged, emailed or exported.
 
 ## Hours and the Excel export
 

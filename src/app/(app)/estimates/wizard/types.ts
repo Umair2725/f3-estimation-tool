@@ -40,6 +40,8 @@ export type WizardProps = {
   initial: WizardState;
   technologies: TechnologyOption[];
   clientNames: string[];
+  /** The requirement documents panel for step 4 (specs/requirement-documents); none for a new request. */
+  documentsPanel?: React.ReactNode;
 };
 
 export type Errors = Record<string, string>;
