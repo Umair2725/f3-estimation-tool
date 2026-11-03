@@ -201,6 +201,8 @@ test("features added from a document survive Back to Requirements and Finish", a
   for (const name of ["Web app", "Online booking", "Staff rota", "Invoices"]) {
     await expect(page.locator(`input[value="${name}"]`).filter({ visible: true })).toHaveCount(1);
   }
+  // The upload message from before doesn't come back stale.
+  await expect(panel.getByText("Reading it now")).toHaveCount(0);
   await page.getByRole("button", { name: "Finish" }).click();
   await expect(page).toHaveURL(new RegExp(`${url}$`));
   const requirements = page.getByRole("region", { name: "Requirements" });
