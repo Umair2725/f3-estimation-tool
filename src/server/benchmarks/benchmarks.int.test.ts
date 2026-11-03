@@ -309,6 +309,7 @@ describe("actual hours feed benchmarks (specs/actual-hours)", () => {
       parts: [{ part: "BACKEND", technologyIds: [tech["Node.js"]] }],
     });
     await saveStep(owner, id, 4, {
+      loadedIds: [],
       features: [{ name: "Sign in", description: "", parts: ["BACKEND"] }],
     });
     const view = await getEstimate(owner, id);

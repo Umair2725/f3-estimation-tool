@@ -87,6 +87,7 @@ async function completeRequest(
   });
   await saveStep(owner, id, 3, { hosting: ["AWS"], environments: ["Production"], compliance: [] });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: [{ name: "Sign in", description: "", parts: ["BACKEND"] }],
   });
   const view = await getEstimate(owner, id);

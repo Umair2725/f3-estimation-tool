@@ -79,6 +79,9 @@ export const featureSchema = z.object({
 
 export const step4Schema = z.object({
   features: z.array(featureSchema).max(300, "Use at most 300 features"),
+  // The feature ids the form loaded. Only these can be removed by a save, so a feature added
+  // elsewhere after the form loaded (from a document, in another tab) is kept.
+  loadedIds: z.array(z.string().max(100)).max(300),
 });
 export type Step4Input = z.input<typeof step4Schema>;
 

@@ -67,6 +67,7 @@ const request: RequestSnapshot = {
   nfr: {},
   parts: [{ part: "WEB_FRONTEND", technologyIds: ["t-react"] }],
   featureNames: ["User login"],
+  featureIds: ["f-login"],
 };
 
 const catalog = [
@@ -113,12 +114,49 @@ describe("buildReview", () => {
   });
 
   it("shows items added earlier as added and unticked", () => {
-    const again = buildReview(proposal, request, catalog, [
+    // "Book appointment" was added and is still in the request (any letter case and spacing).
+    const withAdded = {
+      ...request,
+      featureNames: [...request.featureNames, " book  Appointment "],
+    };
+    const again = buildReview(proposal, withAdded, catalog, [
       proposal.features[0].id,
       proposal.questions[0].id,
     ]);
-    expect(again.features[0]).toMatchObject({ added: true, selected: false });
+    expect(again.features[0]).toMatchObject({ added: true, removed: false, selected: false });
     expect(again.questions[0]).toMatchObject({ added: true, selected: false });
+  });
+
+  it("offers a feature again when it was added but is no longer in the request", () => {
+    const again = buildReview(proposal, request, catalog, [proposal.features[0].id]);
+    expect(again.features[0]).toMatchObject({
+      name: "Book appointment",
+      added: false,
+      removed: true,
+      duplicate: false,
+      selected: false,
+    });
+    // Features never added are unaffected.
+    expect(again.features[1]).toMatchObject({ added: false, removed: false, selected: true });
+  });
+
+  it("follows the feature an item was added as, through merges and renames", () => {
+    const ids = [proposal.features[0].id, proposal.features[1].id];
+    const merged = { ...request, featureNames: ["Appointments"], featureIds: ["f-merged"] };
+    const map = { [ids[0]]: "f-merged", [ids[1]]: "f-merged" };
+    const again = buildReview(proposal, merged, catalog, ids, map);
+    expect(again.features[0]).toMatchObject({ added: true, removed: false });
+    expect(again.features[1]).toMatchObject({ added: true, removed: false });
+
+    // The merged feature is removed from the request: both items are offered again.
+    const gone = buildReview(proposal, { ...merged, featureIds: [] }, catalog, ids, map);
+    expect(gone.features[0]).toMatchObject({ added: false, removed: true, selected: false });
+    expect(gone.features[1]).toMatchObject({ added: false, removed: true, selected: false });
+  });
+
+  it("keeps a duplicate that was never added from this document flagged, not removed", () => {
+    const login = review.features.find((f) => f.name === "user login")!;
+    expect(login).toMatchObject({ duplicate: true, added: false, removed: false });
   });
 });
 

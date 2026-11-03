@@ -68,6 +68,7 @@ async function specRequest(owner: CurrentUser, subTaskCount = 2) {
     nfr: { security: { enabled: true, note: "Pen test before launch" } },
   });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: [
       {
         name: "Appointment booking",

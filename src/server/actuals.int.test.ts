@@ -52,6 +52,7 @@ async function wonRequest(owner: CurrentUser, won = true) {
     parts: [{ part: "BACKEND", technologyIds: [tech["Node.js"]] }],
   });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: [
       { name: "Authentication", parts: ["BACKEND"] },
       { name: "Booking", parts: ["BACKEND"] },

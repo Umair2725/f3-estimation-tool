@@ -96,12 +96,25 @@ describe("step 4", () => {
         { name: "Booking", parts: ["WEB_FRONTEND"] },
         { name: "", parts: [] },
       ],
+      loadedIds: [],
     });
     expect(result.success).toBe(false);
     expect(fieldErrors(result.error!)).toMatchObject({
       "features.1.name": "Enter a feature name",
       "features.1.parts": "Choose at least one part",
     });
+  });
+
+  it("requires the ids of the features the form loaded", () => {
+    const features = [{ key: "f1", name: "Booking", parts: ["WEB_FRONTEND"] }];
+    expect(step4Schema.safeParse({ features }).success).toBe(false);
+    const parsed = step4Schema.parse({ features, loadedIds: ["f1", "f2"] });
+    expect(parsed.loadedIds).toEqual(["f1", "f2"]);
+  });
+
+  it("allows at most 300 loaded ids", () => {
+    const loadedIds = Array.from({ length: 301 }, (_, i) => `f${i}`);
+    expect(step4Schema.safeParse({ features: [], loadedIds }).success).toBe(false);
   });
 });
 

@@ -42,6 +42,7 @@ export type RequestSnapshot = {
   nfr: Partial<Record<NfrKey, { enabled: boolean; note: string }>>;
   parts: { part: Part; technologyIds: string[] }[];
   featureNames: string[];
+  featureIds: string[];
 };
 
 export type CatalogEntry = { id: string; name: string; parts: Part[] };
@@ -57,6 +58,8 @@ export type ReviewFeature = {
   needsConfirmation: boolean;
   duplicate: boolean;
   added: boolean;
+  /** Added earlier but no longer in the request: offered again, unticked. */
+  removed: boolean;
   selected: boolean;
 };
 
@@ -105,9 +108,18 @@ export function buildReview(
   request: RequestSnapshot,
   catalog: CatalogEntry[],
   addedItemIds: string[],
+  /** Proposal item id -> the feature it was added as; older additions have none. */
+  addedFeatures: Record<string, string> = {},
 ): Review {
   const added = new Set(addedItemIds);
   const existing = new Set(request.featureNames.map(normalizeName));
+  const featureIds = new Set(request.featureIds);
+  // Still in the request: its feature exists (merged or renamed ones too); without a record of
+  // the feature, a feature with its name.
+  const stillThere = (item: { id: string; name: string }) =>
+    addedFeatures[item.id] !== undefined
+      ? featureIds.has(addedFeatures[item.id])
+      : existing.has(normalizeName(item.name));
   const row = (item: { id: string; cite: Cite; needsConfirmation: boolean }, filled: boolean) => ({
     id: item.id,
     cite: item.cite,
@@ -116,8 +128,11 @@ export function buildReview(
     selected: !added.has(item.id) && !filled,
   });
 
+  // "Added" only while the request still has the feature; otherwise it can be added again.
   const features: ReviewFeature[] = proposal.features.map((f) => {
     const duplicate = existing.has(normalizeName(f.name));
+    const wasAdded = added.has(f.id);
+    const removed = wasAdded && !stillThere(f);
     return {
       id: f.id,
       itemIds: [f.id],
@@ -127,8 +142,9 @@ export function buildReview(
       cites: [f.cite],
       needsConfirmation: f.needsConfirmation,
       duplicate,
-      added: added.has(f.id),
-      selected: !added.has(f.id) && !duplicate,
+      added: wasAdded && !removed,
+      removed,
+      selected: !wasAdded && !duplicate,
     };
   });
 
@@ -232,6 +248,7 @@ export function mergeFeatures(features: ReviewFeature[], name: string): ReviewFe
     needsConfirmation: features.some((f) => f.needsConfirmation),
     duplicate: false,
     added: false,
+    removed: false,
     selected: true,
   };
 }
@@ -261,6 +278,8 @@ export const SelectionSchema = z.object({
   features: z
     .array(
       z.object({
+        /** The proposal items this feature came from (several after a merge). */
+        itemIds: z.array(z.string().max(200)).max(500).default([]),
         name: z.string().trim().min(1, "Give every feature a name").max(200),
         description: z.string().trim().max(1000),
         parts: z.array(part).min(1, "Choose at least one part"),

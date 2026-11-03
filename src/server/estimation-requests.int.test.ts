@@ -104,6 +104,7 @@ describe("creating and saving steps (specs/estimation-requests)", () => {
       nfr: { security: { enabled: true, note: "Pen test before launch" } },
     });
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [
         {
           name: "Appointment booking",
@@ -147,6 +148,7 @@ describe("creating and saving steps (specs/estimation-requests)", () => {
       ]),
     );
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [{ name: "Photo capture", parts: ["MOBILE", "BACKEND"] }],
     });
     await saveStep(sara, id, 2, step2([{ part: "BACKEND", technologyIds: [tech["Node.js"]] }]));
@@ -162,11 +164,11 @@ describe("creating and saving steps (specs/estimation-requests)", () => {
       saveStep(sara, id, 2, step2([{ part: "MOBILE", technologyIds: [tech["Node.js"]] }])),
     ).rejects.toThrow("Node.js isn't available for Mobile");
     await expect(
-      saveStep(sara, id, 4, { features: [{ name: "X", parts: ["MOBILE"] }] }),
+      saveStep(sara, id, 4, { loadedIds: [], features: [{ name: "X", parts: ["MOBILE"] }] }),
     ).rejects.toMatchObject({ status: 400 });
-    await expect(saveStep(sara, id, 4, { features: [{ name: "X", parts: [] }] })).rejects.toThrow(
-      "Choose at least one part",
-    );
+    await expect(
+      saveStep(sara, id, 4, { loadedIds: [], features: [{ name: "X", parts: [] }] }),
+    ).rejects.toThrow("Choose at least one part");
   });
 
   it("keeps a retired technology already on the request but refuses it for new selections", async () => {
@@ -327,6 +329,7 @@ describe("estimate Tasks follow scope (specs/estimate-hours)", () => {
       ]),
     );
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [
         { name: "Booking", parts: ["BACKEND", "MOBILE"] },
         { name: "Photos", parts: ["MOBILE"] },
@@ -356,6 +359,7 @@ describe("estimate Tasks follow scope (specs/estimate-hours)", () => {
       orderBy: { position: "asc" },
     });
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [
         { key: features[1].id, name: "Photos", parts: ["MOBILE"] },
         { key: features[0].id, name: "Appointment booking", parts: ["BACKEND", "MOBILE"] },
@@ -382,18 +386,102 @@ describe("estimate Tasks follow scope (specs/estimate-hours)", () => {
         { part: "MOBILE", technologyIds: [tech["Flutter"]] },
       ]),
     );
-    await saveStep(sara, id, 4, { features: [{ name: "Booking", parts: ["BACKEND", "MOBILE"] }] });
+    await saveStep(sara, id, 4, {
+      loadedIds: [],
+      features: [{ name: "Booking", parts: ["BACKEND", "MOBILE"] }],
+    });
     const [feature] = await getDb().feature.findMany({ where: { requestId: id } });
 
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [{ key: feature.id, name: "Booking", parts: ["BACKEND"] }],
     });
     expect(await tasksOf(id)).toEqual([{ feature: "Booking", part: "BACKEND", subTasks: 0 }]);
 
     await saveStep(sara, id, 4, {
+      loadedIds: [],
       features: [{ key: feature.id, name: "Booking", parts: ["BACKEND", "MOBILE"] }],
     });
     await saveStep(sara, id, 2, step2([{ part: "MOBILE", technologyIds: [tech["Flutter"]] }]));
     expect(await tasksOf(id)).toEqual([{ feature: "Booking", part: "MOBILE", subTasks: 0 }]);
+  });
+
+  it("keeps a feature added after the form loaded (specs/estimation-requests)", async () => {
+    const sara = await person();
+    const { id } = await createRequest(sara, step1(`Other tab ${tag}`));
+    await saveStep(sara, id, 2, step2([{ part: "BACKEND", technologyIds: [tech["Node.js"]] }]));
+    await saveStep(sara, id, 4, {
+      loadedIds: [],
+      features: [{ name: "Booking", parts: ["BACKEND"] }],
+    });
+    const [booking] = await getDb().feature.findMany({ where: { requestId: id } });
+
+    // The form loaded only "Booking"; meanwhile a feature (with its Task) is added elsewhere.
+    await getDb().feature.create({
+      data: { requestId: id, name: "Reports", parts: ["BACKEND"], position: 1 },
+    });
+    await saveStep(sara, id, 4, {
+      loadedIds: [],
+      features: [{ key: booking.id, name: "Booking", parts: ["BACKEND"] }],
+    });
+    expect(await tasksOf(id)).toEqual([
+      { feature: "Booking", part: "BACKEND", subTasks: 0 },
+      { feature: "Reports", part: "BACKEND", subTasks: 0 },
+    ]);
+
+    // A stale form (it never saw "Reports") saves again, adding a feature of its own.
+    await saveStep(sara, id, 4, {
+      loadedIds: [booking.id],
+      features: [
+        { key: booking.id, name: "Booking", parts: ["BACKEND"] },
+        { key: "new-1", name: "Search", parts: ["BACKEND"] },
+      ],
+    });
+    const features = await getDb().feature.findMany({
+      where: { requestId: id },
+      orderBy: { position: "asc" },
+    });
+    expect(features.map((f) => [f.name, f.position])).toEqual([
+      ["Booking", 0],
+      ["Search", 1],
+      ["Reports", 2],
+    ]);
+    expect((await tasksOf(id)).map((t) => t.feature)).toEqual(["Booking", "Reports", "Search"]);
+  });
+
+  it("removes a feature the person removed in the form, with its Tasks", async () => {
+    const sara = await person();
+    const { id } = await createRequest(sara, step1(`Remove feature ${tag}`));
+    await saveStep(sara, id, 2, step2([{ part: "BACKEND", technologyIds: [tech["Node.js"]] }]));
+    await saveStep(sara, id, 4, {
+      loadedIds: [],
+      features: [
+        { name: "Booking", parts: ["BACKEND"] },
+        { name: "Reports", parts: ["BACKEND"] },
+      ],
+    });
+    const loaded = await getDb().feature.findMany({
+      where: { requestId: id },
+      orderBy: { position: "asc" },
+    });
+    await saveStep(sara, id, 4, {
+      loadedIds: loaded.map((f) => f.id),
+      features: [{ key: loaded[0].id, name: "Booking", parts: ["BACKEND"] }],
+    });
+    expect(await tasksOf(id)).toEqual([{ feature: "Booking", part: "BACKEND", subTasks: 0 }]);
+  });
+
+  it("returns the request's new updatedAt as savedAt", async () => {
+    const sara = await person();
+    const { id } = await createRequest(sara, step1(`Saved at ${tag}`));
+    for (const [step, input] of [
+      [1, step1(`Saved at ${tag} 2`)],
+      [3, {}],
+      [4, { loadedIds: [], features: [] }],
+    ] as const) {
+      const { savedAt } = await saveStep(sara, id, step, input);
+      const row = await getDb().estimationRequest.findUniqueOrThrow({ where: { id } });
+      expect(savedAt.toISOString()).toBe(row.updatedAt.toISOString());
+    }
   });
 });

@@ -176,6 +176,7 @@ function ReviewEditor(
         ),
       ],
       features: pick(features).map((f) => ({
+        itemIds: f.itemIds,
         name: f.name,
         description: f.description,
         parts: f.parts,
@@ -199,7 +200,9 @@ function ReviewEditor(
     start(async () => {
       const result = await applyDocumentAction(props.doc.requestId, props.doc.id, selection);
       props.onNotice(result);
-      if (result.ok) router.refresh();
+      // The estimator goes where the hours are: the Estimate tab, with the new Tasks matched.
+      if (result.ok && result.href) router.push(result.href);
+      else if (result.ok) router.refresh();
     });
   }
 
@@ -264,6 +267,11 @@ function ReviewEditor(
                   {f.added && (
                     <span className="rounded-full bg-ok-bg px-2 py-0.5 text-xs font-semibold text-ok">
                       Added
+                    </span>
+                  )}
+                  {f.removed && (
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-foreground-2">
+                      Removed from the request
                     </span>
                   )}
                 </div>

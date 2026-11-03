@@ -85,10 +85,14 @@ test("upload an RFP, review the proposals and add them to the request", async ({
   await expect(merged.getByTestId("cite")).toHaveCount(2);
 
   await editor.getByRole("button", { name: /^Add to request/ }).click();
-  await expect(editor.getByRole("status")).toHaveText(
+  // The Estimate tab opens with the counts.
+  await expect(page).toHaveURL(new RegExp(`${requestUrl}/estimate$`));
+  await expect(page.getByRole("status").filter({ hasText: "Added 1 feature" })).toHaveText(
     "Added 1 feature, 1 detail, 1 assumption, 0 risks, 1 question to the request.",
   );
-  // Reloaded from the server: the merged items show as added.
+  // Reviewed again: the merged items show as added.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/documents\//);
   await expect(feature("Book appointment")).toContainText("Added");
   await expect(feature("Reschedule appointment")).toContainText("Added");
 
@@ -128,4 +132,97 @@ test("a Tech Lead can download the document but not upload", async ({ browser })
     );
     expect(overflow, path).toBeLessThanOrEqual(0);
   }
+});
+
+test("features added from a document survive Back to Requirements and Finish", async ({
+  browser,
+}) => {
+  test.slow();
+  const page = await as(browser, "admin");
+  await page.goto("/estimates/new");
+  await page.getByLabel("Project name").fill(`Kept features ${Date.now().toString(36)}`);
+  await page.getByLabel("Client", { exact: true }).fill("Contoso");
+  await page.getByRole("button", { name: "Next: Platforms & stack" }).click();
+  const backend = page.getByTestId("part-BACKEND").filter({ visible: true });
+  await backend.getByLabel("Backend").check();
+  await backend.getByLabel("Node.js").check();
+  // The stub reader proposes Backend and Web/Frontend features.
+  const web = page.getByTestId("part-WEB_FRONTEND").filter({ visible: true });
+  await web.getByLabel("Web/Frontend").check();
+  await web.getByLabel("React", { exact: true }).check();
+  await page.getByRole("button", { name: "Next: Environment & compliance" }).click();
+  await page.getByRole("button", { name: "Next: Requirements" }).click();
+  await expect(page).toHaveURL(/\/estimates\/[^/]+\/edit\?step=4$/);
+  const url = new URL(page.url()).pathname.replace(/\/edit$/, "");
+
+  // A feature typed but not saved, then a document uploaded and reviewed.
+  await page.getByRole("button", { name: "Add a feature" }).click();
+  await page.getByLabel("Feature name").last().fill("Web app");
+  await page.getByRole("group", { name: "Parts for Web app" }).getByLabel("Backend").check();
+  const panel = page.getByTestId("documents-panel");
+  const docx = await buildDocx([
+    { heading: "Online booking", paragraphs: ["Customers book online."] },
+    { heading: "Staff rota", paragraphs: ["Managers plan shifts."] },
+    { heading: "Invoices", paragraphs: ["Customers get invoices by email."] },
+  ]);
+  await panel.getByLabel("File").setInputFiles({
+    name: "Scope.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer: Buffer.from(docx),
+  });
+  await panel.getByLabel("This is").selectOption("CLIENT_REQUIREMENTS");
+  await panel.getByRole("button", { name: "Upload" }).click();
+  const row = panel.getByTestId("document-row").filter({ hasText: "Scope.docx" });
+  await expect(row.getByTestId("document-status")).toContainText("Ready to review", {
+    timeout: 20_000,
+  });
+  await row.getByRole("link", { name: "Review" }).click();
+  const editor = page.getByTestId("review-editor");
+  await editor.getByRole("button", { name: /^Add to request/ }).click();
+
+  // The Estimate tab: every new Task already has a suggestion or "No reliable match".
+  await expect(page).toHaveURL(new RegExp(`${url}/estimate$`));
+  await expect(page.getByRole("status").filter({ hasText: "Added 3 features" })).toBeVisible();
+  for (const name of ["Online booking", "Staff rota", "Invoices"]) {
+    const task = page.getByRole("region", { name: `Task ${name}` }).first();
+    await expect(task.getByTestId("suggestion-line")).toBeVisible();
+  }
+
+  // Back to Requirements: the document's features and the typed one are all there.
+  await page.goBack();
+  await editor.getByRole("link", { name: "Back to Requirements" }).click();
+  await expect(page).toHaveURL(new RegExp(`${url}/edit\\?step=4$`));
+  const names = page
+    .getByTestId("feature-row")
+    .filter({ visible: true })
+    .getByLabel("Feature name");
+  await expect(names).toHaveCount(4);
+  for (const name of ["Web app", "Online booking", "Staff rota", "Invoices"]) {
+    await expect(page.locator(`input[value="${name}"]`).filter({ visible: true })).toHaveCount(1);
+  }
+  await page.getByRole("button", { name: "Finish" }).click();
+  await expect(page).toHaveURL(new RegExp(`${url}$`));
+  const requirements = page.getByRole("region", { name: "Requirements" });
+  for (const name of ["Web app", "Online booking", "Staff rota", "Invoices"]) {
+    await expect(requirements).toContainText(name);
+  }
+
+  // Removing a feature still works, and the review then offers it again.
+  await page.goto(`${url}/edit?step=4`);
+  await page.getByRole("button", { name: "Remove Staff rota" }).click();
+  await page.getByRole("button", { name: "Save & exit" }).click();
+  await expect(page).toHaveURL("/");
+  await page.goto(url);
+  await expect(page.getByRole("region", { name: "Requirements" })).not.toContainText("Staff rota");
+  await page
+    .getByTestId("documents-panel")
+    .getByRole("link", { name: /Review|View proposals/ })
+    .first()
+    .click();
+  const rota = page
+    .getByTestId("proposed-feature")
+    .filter({ has: page.locator('input[value="Staff rota"]') });
+  await expect(rota).toContainText("Removed from the request");
+  await expect(rota.getByLabel("Add Staff rota")).not.toBeChecked();
+  await expect(rota.getByLabel("Add Staff rota")).toBeEnabled();
 });

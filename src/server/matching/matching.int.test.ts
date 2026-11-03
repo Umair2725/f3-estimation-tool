@@ -80,6 +80,7 @@ async function request(
   });
   await saveStep(owner, id, 3, { hosting: ["AWS"], environments: ["Production"], compliance: [] });
   await saveStep(owner, id, 4, {
+    loadedIds: [],
     features: features.map((f) => ({ name: f.name, description: "", parts: ["BACKEND"] })),
   });
   const view = await getEstimate(owner, id);
