@@ -571,7 +571,7 @@ function ReviewEditor(
             disabled={pending || total === 0}
             onClick={add}
           >
-            {pending ? "Adding…" : `Add to request (${total})`}
+            {pending ? "Adding and estimating hours…" : `Add to request (${total})`}
           </button>
         )}
         <Link href={`/estimates/${props.doc.requestId}/edit?step=4`} className={ui.secondaryButton}>

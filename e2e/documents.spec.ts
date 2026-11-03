@@ -87,8 +87,9 @@ test("upload an RFP, review the proposals and add them to the request", async ({
   await editor.getByRole("button", { name: /^Add to request/ }).click();
   // The Estimate tab opens with the counts.
   await expect(page).toHaveURL(new RegExp(`${requestUrl}/estimate$`));
-  await expect(page.getByRole("status").filter({ hasText: "Added 1 feature" })).toHaveText(
-    "Added 1 feature, 1 detail, 1 assumption, 0 risks, 1 question to the request.",
+  const notice = page.getByRole("status").filter({ hasText: "Added 1 feature" });
+  await expect(notice).toContainText(
+    "Added 1 feature, 1 detail, 1 assumption, 0 risks, 1 question to the request. Hours:",
   );
   // Reviewed again: the merged items show as added.
   await page.goBack();

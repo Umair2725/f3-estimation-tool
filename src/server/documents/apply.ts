@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 import type { CurrentUser } from "@/server/auth/access";
 import { getDb } from "@/server/db";
 import { canEditRequest, loadForEdit, syncTasks, upsertClient } from "@/server/estimation-requests";
-import { computeSuggestions } from "@/server/matching/matching";
+import { computeSuggestions, fillHours, type FilledHours } from "@/server/matching/matching";
 import { assertAccess, ServiceError } from "@/server/service-error";
 import { effectiveStatus } from "./files";
 
@@ -327,13 +327,16 @@ export async function applyDocument(
     };
   });
 
-  // New features are matched at once; a failure leaves them added (Find matches still works).
+  // New features are matched and their hours filled in at once: a reliable match's hours, or
+  // else an AI guess. A failure leaves them added without hours (Find matches still works).
+  let hours: FilledHours = { matched: 0, guessed: 0, empty: result.taskIds.length };
   if (result.taskIds.length) {
     try {
       await computeSuggestions(requestId, result.taskIds);
+      hours = await fillHours(actor.id, requestId, result.taskIds);
     } catch (err) {
       logger.error("matching after adding document items failed", { requestId, err });
     }
   }
-  return result.counts;
+  return { ...result.counts, hours };
 }
