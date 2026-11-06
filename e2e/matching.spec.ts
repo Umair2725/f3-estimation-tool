@@ -80,7 +80,9 @@ test("a Task with no match gets an AI guess sized in rounds", async ({ browser }
   await minutes.fill("60");
   await task.getByRole("button", { name: "AI guess" }).click();
   const guess = task.getByTestId("ai-guess");
-  await expect(guess).toContainText("4–6 rounds × 60 min, High risk: Third-party API is undocumented");
+  await expect(guess).toContainText(
+    "4–6 rounds × 60 min, High risk: Third-party API is undocumented",
+  );
   await expect(guess).toContainText("2 rounds × 60 min, Low risk");
   await expect(guess).toContainText("Integration, 15% of rounds");
   await expect(task.getByTestId("guess-risks")).toContainText(

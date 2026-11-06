@@ -43,7 +43,8 @@ const parse = (subTasks: unknown[], biggestRisks: string[] = []) =>
 
 describe("AI guess answers (specs/feature-matching)", () => {
   it("refuses an empty guess, a risk above Low without a reason, and rounds outside 1 to 15", () => {
-    const ok = (subTasks: unknown[]) => GuessSchema.safeParse({ subTasks, biggestRisks: [] }).success;
+    const ok = (subTasks: unknown[]) =>
+      GuessSchema.safeParse({ subTasks, biggestRisks: [] }).success;
     expect(ok([])).toBe(false);
     expect(ok([sub({ risk: "HIGH" })])).toBe(false);
     expect(ok([sub({ risk: "HIGH", riskReason: "  " })])).toBe(false);
@@ -72,8 +73,11 @@ describe("sizing a guess in rounds (specs/feature-matching)", () => {
   });
 
   it("needs no reason for Low risk: 2 rounds at 30 minutes is 1–1 h", () => {
-    const [only] = guessToSubTasks(parse([sub({ baseRounds: 2, kind: "BOILERPLATE" })]), 30, NOTE)
-      .subTasks;
+    const [only] = guessToSubTasks(
+      parse([sub({ baseRounds: 2, kind: "BOILERPLATE" })]),
+      30,
+      NOTE,
+    ).subTasks;
     expect(only).toMatchObject({
       minTenths: 10,
       maxTenths: 10,

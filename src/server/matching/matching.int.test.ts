@@ -35,7 +35,10 @@ beforeAll(async () => {
 afterEach(async () => {
   setGuessClientForTests(undefined);
   // One test changes the default minutes per round; put the starting value back.
-  await getDb().estimateDefaults.update({ where: { id: "default" }, data: { minutesPerRound: 60 } });
+  await getDb().estimateDefaults.update({
+    where: { id: "default" },
+    data: { minutesPerRound: 60 },
+  });
 });
 afterAll(async () => {
   const db = getDb();
@@ -600,7 +603,10 @@ describe("hours filled in at once (specs/requirement-documents)", () => {
       };
     });
     // Guesses made while filling hours use the Admin default minutes per round.
-    await getDb().estimateDefaults.update({ where: { id: "default" }, data: { minutesPerRound: 45 } });
+    await getDb().estimateDefaults.update({
+      where: { id: "default" },
+      data: { minutesPerRound: 45 },
+    });
     await findMatches(owner, id);
     const tasks = (await getEstimate(owner, id)).parts[0].tasks;
     const filled = await fillHours(
