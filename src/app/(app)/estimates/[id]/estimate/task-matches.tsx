@@ -40,6 +40,10 @@ export function TaskMatches(props: {
   const [asking, setAsking] = useState(false);
   const [architectId, setArchitectId] = useState("");
   const [note, setNote] = useState("");
+  // The last guess's minutes, else the Admin default (specs/estimate-defaults).
+  const [minutes, setMinutes] = useState(
+    String(suggestion?.minutesPerRound ?? matching.defaultMinutesPerRound),
+  );
 
   const act = (work: () => Promise<{ ok: boolean; message?: string }>) =>
     startTransition(async () => {
@@ -147,6 +151,31 @@ export function TaskMatches(props: {
         </details>
       )}
 
+      {suggestion?.method === "AI_GUESS" && suggestion.suggested && (
+        <div className="mt-2 flex flex-col gap-2" data-testid="ai-guess">
+          <ul className="flex flex-col gap-1 text-xs">
+            {suggestion.suggested.map((s, i) => (
+              <li key={i} className="flex flex-wrap gap-x-2">
+                <span className="font-semibold">{s.title}</span>
+                <span className="tabular-nums">{range(s.minTenths, s.maxTenths)}</span>
+                {/* The rating after the label: "4–6 rounds × 60 min, High risk: …". */}
+                <span className="text-muted">{s.comment.split(" · ").slice(1).join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+          {suggestion.risks.length > 0 && (
+            <div className="text-xs" data-testid="guess-risks">
+              <p className="font-semibold">Biggest risks</p>
+              <ul className="ml-4 list-disc text-foreground-2">
+                {suggestion.risks.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {canEdit && suggestion?.suggested && (
         <div className="mt-2 flex flex-wrap items-end gap-2">
           {blocked && (
@@ -222,7 +251,7 @@ export function TaskMatches(props: {
             </p>
           )}
           {canEdit && !waiting && !asking && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-end gap-2">
               <button
                 type="button"
                 className={ui.smallButton}
@@ -232,14 +261,32 @@ export function TaskMatches(props: {
                 Ask an Architect
               </button>
               {matching.aiGuesses ? (
-                <button
-                  type="button"
-                  className={ui.smallButton}
-                  disabled={pending}
-                  onClick={() => act(() => aiGuessAction(props.requestId, props.taskId))}
-                >
-                  {suggestion?.method === "AI_GUESS" ? "Guess again" : "AI guess"}
-                </button>
+                <>
+                  {/* Hours are rounds × these minutes (specs/feature-matching). */}
+                  <label className={ui.label}>
+                    Minutes per round
+                    <input
+                      type="number"
+                      min={1}
+                      max={480}
+                      step={1}
+                      inputMode="numeric"
+                      className={`${ui.input} min-h-9 w-28`}
+                      value={minutes}
+                      onChange={(e) => setMinutes(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={ui.smallButton}
+                    disabled={pending}
+                    onClick={() =>
+                      act(() => aiGuessAction(props.requestId, props.taskId, Number(minutes)))
+                    }
+                  >
+                    {suggestion?.method === "AI_GUESS" ? "Guess again" : "AI guess"}
+                  </button>
+                </>
               ) : (
                 <span className="self-center text-muted">AI guesses aren&apos;t set up</span>
               )}

@@ -32,6 +32,7 @@ describe("validateEnv: database and basics", () => {
         EMBEDDINGS_PROVIDER: "local",
         EMBEDDINGS_CACHE_DIR: undefined,
         DOCUMENT_READER: "claude",
+        AI_GUESS: "claude",
         ANTHROPIC_API_KEY: undefined,
         ANTHROPIC_MODEL: undefined,
         SMTP_HOST: undefined,
@@ -42,6 +43,14 @@ describe("validateEnv: database and basics", () => {
         MAIL_FROM: undefined,
       },
     });
+  });
+
+  it("accepts the stub AI guess outside production only", () => {
+    expect(validateEnv({ ...base, AI_GUESS: "stub" }).ok).toBe(true);
+    expect(problemsOf({ ...base, AI_GUESS: "gpt" }).map((p) => p.name)).toEqual(["AI_GUESS"]);
+    expect(
+      problemsOf({ ...base, NODE_ENV: "production", AI_GUESS: "stub" }).map((p) => p.name),
+    ).toContain("AI_GUESS");
   });
 
   it("accepts the stub embeddings provider and refuses unknown ones", () => {

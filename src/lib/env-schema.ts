@@ -49,6 +49,11 @@ export const envSchema = z
       (value) => (value === "" ? undefined : value),
       z.enum(["claude", "stub"]).default("claude"),
     ),
+    // AI guesses (specs/feature-matching): Claude when a key is set; "stub" is for tests.
+    AI_GUESS: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["claude", "stub"]).default("claude"),
+    ),
     // Optional: without a key, AI guesses are off. Never logged or shown.
     ANTHROPIC_API_KEY: optionalText,
     ANTHROPIC_MODEL: optionalText,
@@ -88,6 +93,9 @@ export const envSchema = z
       for (const name of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const) {
         if (!env[name]) ctx.addIssue({ code: "custom", path: [name], message: "required" });
       }
+    }
+    if (production && env.AI_GUESS === "stub") {
+      ctx.addIssue({ code: "custom", path: ["AI_GUESS"], message: "not allowed in production" });
     }
     if (production && env.DOCUMENT_READER === "stub") {
       ctx.addIssue({
