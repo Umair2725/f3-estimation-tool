@@ -337,11 +337,12 @@ The tool suggests hours for each Task (one feature on one part) from Folio3's ap
 - **No reliable match:**
   - **Ask an Architect** for reference hours. The Architect sees the request on the Reviews page and adds Sub tasks with Min/Max, or declines with a reason.
   - The reference is used at once for this Task and for every similar feature in later requests.
-  - **AI guess** (optional): with `ANTHROPIC_API_KEY` in `.env`, Claude proposes Sub tasks labelled "AI-generated, no historical reference". Only the request's own feature, part and stack are sent; never client names or other estimates.
-    - Sizing follows [agent-estimation](https://github.com/ZhangHanDong/agent-estimation) (MIT). Claude gives each Sub task base **rounds** (Boilerplate 1–2, Moderate 3–5, Exploratory 5–10, High uncertainty 8–15) and a risk level (Low 1.0, Medium 1.3, High 1.5, Very high 2.0, with a reason above Low). It never gives hours.
-    - Min = base rounds, and Max = base rounds × the risk factor. Guesses with 2 or more Sub tasks get an "Integration and wiring" Sub task at 15% of the rounds.
-    - Hours = rounds × **minutes per round** ÷ 60. The estimator enters the minutes next to "AI guess" (whole 1–480). It is pre-filled from **Settings → Estimate defaults → Default minutes per round** (starts at 60), which also sizes the guesses made when features are added from a document.
-- The review page flags AI guesses, Tasks with no match and no hours, and Tasks waiting for a reference.
+- **AI estimate** (optional, on any matched Task): with `ANTHROPIC_API_KEY` in `.env`, Claude proposes Sub tasks labelled "AI-generated, no historical reference". Only the request's own feature, part and stack are sent; never client names or other estimates.
+  - On a Task with a reliable match it replaces the suggestion as a second opinion. "Find again" brings the match back, and Ask an Architect stays for Tasks with no reliable match.
+  - Sizing follows [agent-estimation](https://github.com/ZhangHanDong/agent-estimation) (MIT). Claude gives each Sub task base **rounds** (Boilerplate 1–2, Moderate 3–5, Exploratory 5–10, High uncertainty 8–15) and a risk level (Low 1.0, Medium 1.3, High 1.5, Very high 2.0, with a reason above Low). It never gives hours.
+  - Min = base rounds, and Max = base rounds × the risk factor. Guesses with 2 or more Sub tasks get an "Integration and wiring" Sub task at 15% of the rounds.
+  - Hours = rounds × **minutes per round** ÷ 60. The estimator enters the minutes next to "AI estimate" (whole 1–480). It is pre-filled from **Settings → Estimate defaults → Default minutes per round** (starts at 60), which also sizes the guesses made when features are added from a document.
+- The review page flags AI estimates, Tasks with no match and no hours, and Tasks waiting for a reference.
 - **Settings:**
   - `EMBEDDINGS_PROVIDER` is `local` (default) or `stub` (tests only).
   - `EMBEDDINGS_CACHE_DIR` is where the model is cached.

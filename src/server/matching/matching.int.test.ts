@@ -495,7 +495,7 @@ describe("AI guess", () => {
     setGuessClientForTests(null);
     expect((await getMatching(owner, id)).aiGuesses).toBe(false);
     await expect(requestAiGuess(owner, id, task.taskId, 60)).rejects.toThrow(
-      "AI guesses aren't set up",
+      "AI estimates aren't set up",
     );
 
     const seen: unknown[] = [];
@@ -570,8 +570,56 @@ describe("AI guess", () => {
     await submitForReview(owner, id, { reviewerId: lead.id });
     const attention = (await getReview(lead, id)).attention;
     expect(attention.find((g) => g.code === "ai-guess")).toMatchObject({
-      summary: "1 Task uses an AI guess",
+      summary: "1 Task uses an AI estimate",
       items: [{ taskId: task.taskId }],
+    });
+  });
+
+  it("replaces a reliable match's suggestion, keeps the matches, and Find again restores it", async () => {
+    const owner = await person();
+    const lead = await person("TECH_LEAD");
+    const architect = await person("ARCHITECT");
+    const name = `${word("Quasar")} customer invoicing`;
+    const source = await request(owner, [
+      { name, subTasks: [{ title: "Invoice API", min: 10, max: 14 }] },
+    ]);
+    await approved(owner, lead, source);
+    const target = await request(owner, [{ name, subTasks: [{ title: "Mine", min: 1, max: 2 }] }]);
+    const task = await taskOf(owner, target, name);
+
+    // Never matched: nothing to replace yet.
+    setGuessClientForTests(async () => ({
+      subTasks: [{ title: "Invoicing", kind: "MODERATE", baseRounds: 3, risk: "LOW" }],
+      biggestRisks: [],
+    }));
+    await expect(requestAiGuess(owner, target, task.taskId, 60)).rejects.toThrow(
+      "Find matches for this Task first",
+    );
+
+    await findMatches(owner, target);
+    const matched = (await getMatching(owner, target)).byTask[task.taskId].suggestion!;
+    expect(matched).toMatchObject({ method: "AI_ERA_ESTIMATE", reliableMatch: true });
+
+    await requestAiGuess(owner, target, task.taskId, 60);
+    const estimated = (await getMatching(owner, target)).byTask[task.taskId].suggestion!;
+    expect(estimated).toMatchObject({
+      method: "AI_GUESS",
+      minTenths: 30,
+      maxTenths: 30,
+      reliableMatch: true,
+      decision: "PENDING",
+    });
+    expect(estimated.matches[0]).toMatchObject({ requestId: source });
+    // The Task's own Sub tasks wait for Accept or Adjust.
+    expect((await taskOf(owner, target, name)).subTasks.map((s) => s.title)).toEqual(["Mine"]);
+    await expect(
+      askArchitect(owner, target, task.taskId, { architectId: architect.id }),
+    ).rejects.toThrow("Ask an Architect only when there is no reliable match");
+
+    await findMatches(owner, target, task.taskId);
+    expect((await getMatching(owner, target)).byTask[task.taskId].suggestion).toMatchObject({
+      method: "AI_ERA_ESTIMATE",
+      minutesPerRound: null,
     });
   });
 });

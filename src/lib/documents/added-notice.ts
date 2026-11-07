@@ -30,7 +30,7 @@ export function addedMessage(counts: AddedCounts): string {
   const { matched, guessed, empty } = counts.hours;
   const hours = [
     matched && `${tasks(matched)} from past estimates`,
-    guessed && `${tasks(guessed)} from an AI guess (check them)`,
+    guessed && `${tasks(guessed)} from an AI estimate (check them)`,
     empty && `${tasks(empty)} still without hours`,
   ].filter(Boolean);
   return hours.length ? `${added} Hours: ${hours.join(", ")}.` : added;

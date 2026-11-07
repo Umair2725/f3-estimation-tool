@@ -14,7 +14,7 @@ describe("added notice", () => {
   it("words the counts and where the hours came from", () => {
     expect(addedMessage(counts)).toBe(
       "Added 15 features, 7 details, 1 assumption, 0 risks, 2 questions to the request. " +
-        "Hours: 9 Tasks from past estimates, 5 Tasks from an AI guess (check them), " +
+        "Hours: 9 Tasks from past estimates, 5 Tasks from an AI estimate (check them), " +
         "1 Task still without hours.",
     );
   });

@@ -14,7 +14,7 @@ import {
 // Anthropic API key is set; the prompt holds only this request's own details.
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
-export const GUESS_FAILED = "The AI guess failed. Try again or ask an Architect.";
+export const GUESS_FAILED = "The AI estimate failed. Try again.";
 
 /** Swappable in tests, so nothing calls the network there. */
 export type GuessClient = (input: GuessInput) => Promise<Guess>;

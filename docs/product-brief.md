@@ -125,6 +125,7 @@ For each feature, the tool searches the knowledge base and shows:
   - The AI estimates each Sub task in **rounds** (one think, write, run and fix cycle), with a risk level and a reason, plus 15% for integration. It never gives hours.
   - The estimator enters **minutes per round** when asking for the guess. It is pre-filled with an Admin default (60 to start).
   - Min = base rounds, and Max = rounds × the risk factor, both converted with the minutes per round.
+- **AI estimate on any Task** (decision of 2026-11-07). The estimator can also ask for this AI estimate on a Task that has a reliable match, as a second opinion. It replaces the suggestion, keeps the "AI-generated, no historical reference" label, and "Find again" brings the match back.
 - **Accept**, **Adjust** (with a reason) or **Reject** for each suggestion.
 
 **Acceptance:** Every proposed number either links to at least one source estimate or is labeled "AI-generated, no historical reference".
