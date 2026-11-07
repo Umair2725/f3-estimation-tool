@@ -23,6 +23,11 @@ import { assertAccess, ServiceError } from "../service-error";
 import { aiGuessesEnabled, guess, GUESS_FAILED } from "./ai-guess";
 import { embedderFor } from "./embedder";
 import { createReferenceBenchmark } from "../benchmarks/benchmarks";
+import {
+  MINUTES_PER_ROUND_MESSAGE,
+  minutesPerRoundSchema,
+  readDefaults,
+} from "../estimate-defaults";
 import { indexBenchmark, searchKnowledge } from "./knowledge";
 
 // Matching (specs/feature-matching): find matches, decide on suggestions, ask an Architect for
@@ -101,6 +106,9 @@ export async function computeSuggestions(requestId: string, taskIds?: string[]) 
         : Prisma.DbNull,
       suggestedMinTenths: suggestion.minTenths,
       suggestedMaxTenths: suggestion.maxTenths,
+      // Only an AI guess has these; a new search clears an earlier guess's.
+      minutesPerRound: null,
+      guessRisks: [],
       decision: "PENDING" as const,
       reason: null,
       decidedById: null,
@@ -130,6 +138,9 @@ export type SuggestionView = {
   suggested: SuggestedSubTask[] | null;
   minTenths: number | null;
   maxTenths: number | null;
+  /** AI guesses only: the minutes per round used and the biggest risks. */
+  minutesPerRound: number | null;
+  risks: string[];
   decision: "PENDING" | "ACCEPTED" | "ADJUSTED" | "REJECTED";
   reason: string | null;
   decidedByName: string | null;
@@ -147,6 +158,8 @@ export type ReferenceAsk = {
 export type MatchingView = {
   canEdit: boolean;
   aiGuesses: boolean;
+  /** Pre-fills the AI guess's minutes per round (specs/estimate-defaults). */
+  defaultMinutesPerRound: number;
   architects: { id: string; name: string }[];
   byTask: Record<string, { suggestion: SuggestionView | null; ask: ReferenceAsk | null }>;
 };
@@ -185,6 +198,8 @@ export async function getMatching(
         suggested: (s.suggested as unknown as SuggestedSubTask[] | null) ?? null,
         minTenths: s.suggestedMinTenths,
         maxTenths: s.suggestedMaxTenths,
+        minutesPerRound: s.minutesPerRound,
+        risks: s.method === "AI_GUESS" ? s.guessRisks : [],
         decision: s.decision,
         reason: s.reason,
         decidedByName: s.decidedBy?.name ?? null,
@@ -206,6 +221,7 @@ export async function getMatching(
   return {
     canEdit,
     aiGuesses: aiGuessesEnabled(),
+    defaultMinutesPerRound: (await readDefaults(db)).minutesPerRound,
     architects: canEdit ? await architectChoices() : [],
     byTask,
   };
@@ -272,9 +288,21 @@ export async function decideSuggestion(
 
 // ---------- AI guess ----------
 
-export async function requestAiGuess(actor: CurrentUser | null, requestId: string, taskId: string) {
+export async function requestAiGuess(
+  actor: CurrentUser | null,
+  requestId: string,
+  taskId: string,
+  minutesPerRound: unknown,
+) {
   assertAccess(actor, "estimate.edit");
   if (!aiGuessesEnabled()) throw new ServiceError("AI guesses aren't set up", 400);
+  // Checked before anything else, so a bad value never reaches the AI or changes the Task.
+  const minutes = minutesPerRoundSchema.safeParse(minutesPerRound);
+  if (!minutes.success) {
+    throw new ServiceError(MINUTES_PER_ROUND_MESSAGE, 400, {
+      minutesPerRound: MINUTES_PER_ROUND_MESSAGE,
+    });
+  }
   const db = getDb();
   const request = await db.$transaction((tx) => loadForEdit(tx, actor, requestId));
   const [task] = await loadTasks(db, requestId, [taskId]);
@@ -283,20 +311,28 @@ export async function requestAiGuess(actor: CurrentUser | null, requestId: strin
   if (!current || (current.method !== "NO_MATCH" && current.method !== "AI_GUESS")) {
     throw new ServiceError("AI guesses are only for Tasks with no reliable match", 400);
   }
-  let subTasks: SuggestedSubTask[];
+  let guessed: SizedGuess;
   try {
-    subTasks = await guessSubTasks(request, task);
+    guessed = await guessSubTasks(request, task, minutes.data);
   } catch (err) {
     logger.warn("AI guess failed", { requestId, taskId, err });
     throw new ServiceError(GUESS_FAILED, 400);
   }
-  await db.taskSuggestion.update({ where: { taskId }, data: aiGuessData(subTasks) });
+  await db.taskSuggestion.update({ where: { taskId }, data: aiGuessData(guessed) });
 }
 
 type GuessRequest = { applicationTypes: string[]; considerations: Prisma.JsonValue };
+type SizedGuess = ReturnType<typeof guessToSubTasks> & { minutesPerRound: number };
 
-/** The AI-only guess for one Task; only this request's own details are sent. */
-async function guessSubTasks(request: GuessRequest, task: TaskContext) {
+/**
+ * The AI-only guess for one Task; only this request's own details are sent. The minutes per round
+ * are not: the model judges rounds, and turning them into hours happens here.
+ */
+async function guessSubTasks(
+  request: GuessRequest,
+  task: TaskContext,
+  minutesPerRound: number,
+): Promise<SizedGuess> {
   const result = await guess({
     applicationTypes: request.applicationTypes,
     partLabel: task.partLabel,
@@ -304,15 +340,17 @@ async function guessSubTasks(request: GuessRequest, task: TaskContext) {
     featureDescription: task.featureDescription,
     compliance: readConsiderations(request.considerations).compliance,
   });
-  return guessToSubTasks(result, AI_GUESS_NOTE);
+  return { ...guessToSubTasks(result, minutesPerRound, AI_GUESS_NOTE), minutesPerRound };
 }
 
-function aiGuessData(subTasks: SuggestedSubTask[]) {
+function aiGuessData({ subTasks, risks, minutesPerRound }: SizedGuess) {
   return {
     method: "AI_GUESS" as const,
     suggested: subTasks as unknown as Prisma.InputJsonValue,
     suggestedMinTenths: subTasks.reduce((n, s) => n + s.minTenths, 0),
     suggestedMaxTenths: subTasks.reduce((n, s) => n + s.maxTenths, 0),
+    minutesPerRound,
+    guessRisks: risks,
     decision: "PENDING" as const,
     reason: null,
     decidedById: null,
@@ -380,6 +418,8 @@ export async function fillHours(
   }
 
   if (toGuess.length) {
+    // Nobody is there to type minutes per round, so the Admin default sizes these guesses.
+    const { minutesPerRound } = await readDefaults(db);
     const tasks = new Map((await loadTasks(db, requestId, toGuess)).map((t) => [t.taskId, t]));
     const queue = [...toGuess];
     const worker = async () => {
@@ -387,8 +427,8 @@ export async function fillHours(
         const task = tasks.get(taskId);
         try {
           if (!task) throw new Error("Task not found");
-          const subTasks = await guessSubTasks(request, task);
-          await accept(taskId, subTasks, aiGuessData(subTasks));
+          const guessed = await guessSubTasks(request, task, minutesPerRound);
+          await accept(taskId, guessed.subTasks, aiGuessData(guessed));
           filled.guessed++;
         } catch (err) {
           logger.warn("AI guess while filling hours failed", { requestId, taskId, err });

@@ -63,12 +63,45 @@ test("the Admin finds matches and accepts one from Field service app", async ({ 
   );
 });
 
-test("a Task with no match goes to an Architect", async ({ browser }) => {
+test("a Task with no match gets an AI guess sized in rounds", async ({ browser }) => {
+  // The stub guess (AI_GUESS=stub): Core logic 4 rounds at High risk, Screens 2 rounds at Low.
   const page = await as(browser, "admin");
   await page.goto(`${requestUrl}/estimate`);
   const task = page.getByRole("region", { name: `Task ${unknown}` });
   await expect(task.getByTestId("suggestion-line")).toContainText("No reliable match");
-  await expect(task.getByText("AI guesses aren't set up")).toBeVisible();
+  const minutes = task.getByLabel("Minutes per round");
+  await expect(minutes).toHaveValue("60");
+
+  await minutes.fill("0");
+  await task.getByRole("button", { name: "AI guess" }).click();
+  await expect(task.getByText("Enter whole minutes from 1 to 480")).toBeVisible();
+  await expect(task.getByTestId("suggestion-line")).toContainText("No reliable match");
+
+  await minutes.fill("60");
+  await task.getByRole("button", { name: "AI guess" }).click();
+  const guess = task.getByTestId("ai-guess");
+  await expect(guess).toContainText(
+    "4–6 rounds × 60 min, High risk: Third-party API is undocumented",
+  );
+  await expect(guess).toContainText("2 rounds × 60 min, Low risk");
+  await expect(guess).toContainText("Integration, 15% of rounds");
+  await expect(task.getByTestId("guess-risks")).toContainText(
+    "The client's rules for this feature are not written down yet",
+  );
+  // 4–6 h + 2–2 h + integration 0.9–1.2 h.
+  await expect(task.getByTestId("suggestion-line")).toContainText("6.9–9.2 h");
+
+  // Guess again at 30 minutes per round halves the hours.
+  await task.getByLabel("Minutes per round").fill("30");
+  await task.getByRole("button", { name: "Guess again" }).click();
+  await expect(task.getByTestId("ai-guess")).toContainText("4–6 rounds × 30 min");
+  await expect(task.getByTestId("suggestion-line")).toContainText("3.5–4.6 h");
+});
+
+test("a Task with no match goes to an Architect", async ({ browser }) => {
+  const page = await as(browser, "admin");
+  await page.goto(`${requestUrl}/estimate`);
+  const task = page.getByRole("region", { name: `Task ${unknown}` });
   await task.getByRole("button", { name: "Ask an Architect" }).click();
   await task.getByLabel("Architect").selectOption({ label: "Dev Architect" });
   await task.getByLabel("Note (optional)").fill("New for us");

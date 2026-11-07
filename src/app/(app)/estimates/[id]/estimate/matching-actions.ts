@@ -65,9 +65,9 @@ export async function askArchitectAction(
   );
 }
 
-export async function aiGuessAction(requestId: string, taskId: string) {
+export async function aiGuessAction(requestId: string, taskId: string, minutesPerRound: number) {
   return run(
-    async () => requestAiGuess(await getCurrentUser(), requestId, taskId),
+    async () => requestAiGuess(await getCurrentUser(), requestId, taskId, minutesPerRound),
     "AI guess ready.",
   );
 }

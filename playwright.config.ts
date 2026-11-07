@@ -47,6 +47,8 @@ export default defineConfig({
       ANTHROPIC_API_KEY: "",
       // A test-only reader for requirement documents (specs/requirement-documents).
       DOCUMENT_READER: "stub",
+      // A test-only AI guess, so its rounds and risks can be checked (specs/feature-matching).
+      AI_GUESS: "stub",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

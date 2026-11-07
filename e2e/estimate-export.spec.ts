@@ -108,4 +108,18 @@ test.describe("estimate defaults", () => {
       await expect(page.getByRole("status")).toContainText("Defaults saved");
     }
   });
+
+  test("the default minutes per round starts at 60 and must be 1 to 480", async ({ page }) => {
+    // Only an invalid value is tried: a saved change would affect the AI guess spec running alongside.
+    await page.goto("/settings/estimate-defaults");
+    const minutes = page.getByLabel("Default minutes per round");
+    await expect(minutes).toHaveValue("60");
+    // The field itself refuses 600 (min 1, max 480), so nothing is sent; the server's own check
+    // is covered by the integration tests.
+    await minutes.fill("600");
+    await page.getByRole("button", { name: "Save defaults" }).click();
+    expect(await minutes.evaluate((el: HTMLInputElement) => el.checkValidity())).toBe(false);
+    await page.reload();
+    await expect(page.getByLabel("Default minutes per round")).toHaveValue("60");
+  });
 });

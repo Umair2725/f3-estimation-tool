@@ -121,6 +121,10 @@ For each feature, the tool searches the knowledge base and shows:
   The suggestion always says which of these it used.
 - A **reference link** for every suggestion, so the estimator can open the source estimate.
 - A **"No reliable match"** label when similarity is below a threshold. The tool then gives a clearly marked AI-only guess or leaves the hours blank. It never presents a guess as historical data.
+- **How the AI-only guess is sized** (decision of 2026-11-05). The guess uses the [agent-estimation](https://github.com/ZhangHanDong/agent-estimation) method:
+  - The AI estimates each Sub task in **rounds** (one think, write, run and fix cycle), with a risk level and a reason, plus 15% for integration. It never gives hours.
+  - The estimator enters **minutes per round** when asking for the guess. It is pre-filled with an Admin default (60 to start).
+  - Min = base rounds, and Max = rounds × the risk factor, both converted with the minutes per round.
 - **Accept**, **Adjust** (with a reason) or **Reject** for each suggestion.
 
 **Acceptance:** Every proposed number either links to at least one source estimate or is labeled "AI-generated, no historical reference".

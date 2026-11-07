@@ -32,7 +32,14 @@ let tech: Record<string, string>;
 beforeAll(async () => {
   tech = Object.fromEntries((await getDb().technology.findMany()).map((t) => [t.name, t.id]));
 });
-afterEach(() => setGuessClientForTests(undefined));
+afterEach(async () => {
+  setGuessClientForTests(undefined);
+  // One test changes the default minutes per round; put the starting value back.
+  await getDb().estimateDefaults.update({
+    where: { id: "default" },
+    data: { minutesPerRound: 60 },
+  });
+});
 afterAll(async () => {
   const db = getDb();
   await db.featureBenchmark.deleteMany({ where: { createdById: { in: users } } });
@@ -487,16 +494,38 @@ describe("AI guess", () => {
 
     setGuessClientForTests(null);
     expect((await getMatching(owner, id)).aiGuesses).toBe(false);
-    await expect(requestAiGuess(owner, id, task.taskId)).rejects.toThrow(
+    await expect(requestAiGuess(owner, id, task.taskId, 60)).rejects.toThrow(
       "AI guesses aren't set up",
     );
 
     const seen: unknown[] = [];
     setGuessClientForTests(async (input) => {
       seen.push(input);
-      return { subTasks: [{ title: "Forecast model", minHours: 12, maxHours: 8 }] };
+      return {
+        subTasks: [
+          {
+            title: "Forecast model",
+            kind: "MODERATE",
+            baseRounds: 4,
+            risk: "HIGH",
+            riskReason: "SDK docs are sparse",
+          },
+        ],
+        biggestRisks: ["Client's data history may be incomplete"],
+      };
     });
-    await requestAiGuess(owner, id, task.taskId);
+
+    // A bad minutes per round is refused before the AI is called, and changes nothing.
+    for (const minutes of [0, 30.5, 481, "60"]) {
+      await expect(requestAiGuess(owner, id, task.taskId, minutes)).rejects.toMatchObject({
+        status: 400,
+        message: "Enter whole minutes from 1 to 480",
+      });
+    }
+    expect(seen).toEqual([]);
+    expect((await getMatching(owner, id)).byTask[task.taskId].suggestion!.method).toBe("NO_MATCH");
+
+    await requestAiGuess(owner, id, task.taskId, 60);
     expect(seen).toEqual([
       {
         applicationTypes: ["Web"],
@@ -506,9 +535,36 @@ describe("AI guess", () => {
         compliance: [],
       },
     ]);
-    const guessed = (await getMatching(owner, id)).byTask[task.taskId].suggestion!;
-    expect(guessed).toMatchObject({ method: "AI_GUESS", minTenths: 80, maxTenths: 120 });
-    expect(guessed.suggested![0].comment).toBe("AI-generated, no historical reference");
+    const view = await getMatching(owner, id);
+    expect(view.defaultMinutesPerRound).toBe(60);
+    const guessed = view.byTask[task.taskId].suggestion!;
+    expect(guessed).toMatchObject({
+      method: "AI_GUESS",
+      minTenths: 40,
+      maxTenths: 60,
+      minutesPerRound: 60,
+      risks: ["Client's data history may be incomplete"],
+    });
+    expect(guessed.suggested![0]).toMatchObject({
+      comment:
+        "AI-generated, no historical reference · 4–6 rounds × 60 min, High risk: SDK docs are sparse",
+      kind: "MODERATE",
+      baseRounds: 4,
+      risk: "HIGH",
+    });
+
+    // Guess again at 90 minutes replaces the hours, the minutes and the risks.
+    setGuessClientForTests(async () => ({
+      subTasks: [{ title: "Forecast model", kind: "MODERATE", baseRounds: 4, risk: "LOW" }],
+      biggestRisks: [],
+    }));
+    await requestAiGuess(owner, id, task.taskId, 90);
+    expect((await getMatching(owner, id)).byTask[task.taskId].suggestion).toMatchObject({
+      minTenths: 60,
+      maxTenths: 60,
+      minutesPerRound: 90,
+      risks: [],
+    });
 
     await decideSuggestion(owner, id, task.taskId, { decision: "ACCEPTED" });
     await submitForReview(owner, id, { reviewerId: lead.id });
@@ -541,7 +597,15 @@ describe("hours filled in at once (specs/requirement-documents)", () => {
     ]);
     setGuessClientForTests(async (input) => {
       if (input.featureName === failing) throw new Error("model unavailable");
-      return { subTasks: [{ title: "Telemetry pipeline", minHours: 5, maxHours: 7 }] };
+      return {
+        subTasks: [{ title: "Telemetry pipeline", kind: "MODERATE", baseRounds: 4, risk: "LOW" }],
+        biggestRisks: [],
+      };
+    });
+    // Guesses made while filling hours use the Admin default minutes per round.
+    await getDb().estimateDefaults.update({
+      where: { id: "default" },
+      data: { minutesPerRound: 45 },
     });
     await findMatches(owner, id);
     const tasks = (await getEstimate(owner, id)).parts[0].tasks;
@@ -562,11 +626,18 @@ describe("hours filled in at once (specs/requirement-documents)", () => {
     ]);
     expect(suggestion(matched)).toMatchObject({ decision: "ACCEPTED", decidedByName: owner.name });
 
+    // 4 rounds × 45 minutes = 3 h.
     expect(task(unmatched).subTasks).toMatchObject([
-      { title: "Telemetry pipeline", min: 5, max: 7 },
+      { title: "Telemetry pipeline", min: 3, max: 3 },
     ]);
-    expect(task(unmatched).subTasks[0].comment).toBe("AI-generated, no historical reference");
-    expect(suggestion(unmatched)).toMatchObject({ method: "AI_GUESS", decision: "ACCEPTED" });
+    expect(task(unmatched).subTasks[0].comment).toBe(
+      "AI-generated, no historical reference · 4 rounds × 45 min, Low risk",
+    );
+    expect(suggestion(unmatched)).toMatchObject({
+      method: "AI_GUESS",
+      decision: "ACCEPTED",
+      minutesPerRound: 45,
+    });
 
     // A failed guess leaves the Task as "No reliable match" without hours.
     expect(task(failing).subTasks).toEqual([]);

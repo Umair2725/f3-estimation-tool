@@ -26,8 +26,27 @@ export function setGuessClientForTests(client: GuessClient | null | undefined) {
 
 export function aiGuessesEnabled(): boolean {
   if (override !== undefined) return override !== null;
-  return !!getEnv().ANTHROPIC_API_KEY;
+  const env = getEnv();
+  return env.AI_GUESS === "stub" || !!env.ANTHROPIC_API_KEY;
 }
+
+/**
+ * Deterministic guess for end-to-end tests (AI_GUESS=stub, refused in production): one Moderate
+ * Sub task at High risk and one Boilerplate at Low, so rounds, reasons and integration all show.
+ */
+export const stubGuess: GuessClient = async () => ({
+  subTasks: [
+    {
+      title: "Core logic",
+      kind: "MODERATE",
+      baseRounds: 4,
+      risk: "HIGH",
+      riskReason: "Third-party API is undocumented",
+    },
+    { title: "Screens", kind: "BOILERPLATE", baseRounds: 2, risk: "LOW" },
+  ],
+  biggestRisks: ["The client's rules for this feature are not written down yet"],
+});
 
 async function claudeGuess(input: GuessInput): Promise<Guess> {
   const env = getEnv();
@@ -49,6 +68,6 @@ async function claudeGuess(input: GuessInput): Promise<Guess> {
 }
 
 export async function guess(input: GuessInput): Promise<Guess> {
-  const client = override ?? claudeGuess;
+  const client = override ?? (getEnv().AI_GUESS === "stub" ? stubGuess : claudeGuess);
   return client(input);
 }

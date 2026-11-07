@@ -5,6 +5,7 @@ import { getDb } from "@/server/db";
 import { createUser, deleteUsers } from "../../test/factories";
 import {
   DEFAULT_RATE_MESSAGE,
+  MINUTES_PER_ROUND_MESSAGE,
   getDefaults,
   readDefaults,
   updateDefaults,
@@ -41,7 +42,25 @@ describe("estimate defaults (specs/estimate-defaults)", () => {
       bugFixPercent: 10,
       defaultRate: 30,
       approvedRates: [25, 30, 35, 40, 45, 50],
+      minutesPerRound: 60,
     });
+  });
+
+  it("lets an Admin change the default minutes per round (whole 1 to 480)", async () => {
+    const admin = await person("ADMIN");
+    await updateDefaults(admin, { ...original, minutesPerRound: 45 });
+    expect((await readDefaults()).minutesPerRound).toBe(45);
+    for (const minutesPerRound of [0, 600, 30.5]) {
+      await expect(updateDefaults(admin, { ...original, minutesPerRound })).rejects.toMatchObject({
+        status: 400,
+        message: MINUTES_PER_ROUND_MESSAGE,
+      });
+    }
+    await expect(
+      updateDefaults(await person("ESTIMATOR"), { ...original, minutesPerRound: 90 }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect((await readDefaults()).minutesPerRound).toBe(45);
+    await updateDefaults(admin, original);
   });
 
   it("applies an Admin change to new requests only", async () => {

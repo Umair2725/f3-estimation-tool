@@ -335,6 +335,8 @@ model EstimateDefaults {
   bugFixPercent Int      @default(10) @map("bug_fix_percent")
   defaultRate   Int      @default(30) @map("default_rate")
   approvedRates Int[]    @default([25, 30, 35, 40, 45, 50]) @map("approved_rates")
+  // Pre-fills the AI guess's minutes per round (specs/estimate-defaults).
+  minutesPerRound Int    @default(60) @map("minutes_per_round")
   updatedAt     DateTime @updatedAt @map("updated_at")
   updatedById   String?  @map("updated_by_id")
 
@@ -710,6 +712,9 @@ model TaskSuggestion {
   suggested          Json? // [{ title, minTenths, maxTenths, comment }]
   suggestedMinTenths Int?               @map("suggested_min_tenths")
   suggestedMaxTenths Int?               @map("suggested_max_tenths")
+  // AI guesses only (specs/feature-matching): the minutes per round used and the biggest risks.
+  minutesPerRound    Int?               @map("minutes_per_round")
+  guessRisks         String[]           @default([]) @map("guess_risks")
   decision           SuggestionDecision @default(PENDING)
   reason             String?
   decidedById        String?            @map("decided_by_id")

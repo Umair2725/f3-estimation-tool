@@ -174,6 +174,37 @@ export function DefaultsForm({ initial }: { initial: EstimateDefaults }) {
         </div>
       </section>
 
+      <section aria-labelledby="ai-guess-title" className={`${ui.card} p-5`}>
+        <h2 id="ai-guess-title" className="text-lg font-bold">
+          AI guess
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          An AI guess estimates each Sub task in rounds (one think, write, run and fix cycle). Hours
+          are rounds × minutes per round. This value pre-fills the estimator&apos;s field and sizes
+          the guesses made when features are added from a document.
+        </p>
+        <div className="mt-4 flex flex-col gap-1">
+          <label htmlFor="minutes-per-round" className="text-sm font-semibold">
+            Default minutes per round
+          </label>
+          <input
+            id="minutes-per-round"
+            type="number"
+            min={1}
+            max={480}
+            step={1}
+            inputMode="numeric"
+            className={`${ui.input} w-32`}
+            value={value.minutesPerRound}
+            aria-invalid={!!errors.minutesPerRound}
+            onChange={(e) => setValue({ ...value, minutesPerRound: Number(e.target.value) })}
+          />
+          {errors.minutesPerRound && (
+            <span className={ui.fieldError}>{errors.minutesPerRound}</span>
+          )}
+        </div>
+      </section>
+
       <div>
         <button type="submit" className={ui.primaryButton} disabled={pending}>
           Save defaults
