@@ -136,7 +136,7 @@ describe("review attention for matching", () => {
       waitingReference: [],
     });
     expect(groups.map((g) => [g.code, g.summary, g.items.map((i) => i.taskId)])).toEqual([
-      ["ai-guess", "1 Task uses an AI guess", ["t1"]],
+      ["ai-guess", "1 Task uses an AI estimate", ["t1"]],
       ["no-match", "2 Tasks have no reliable match and no hours", ["t2", "t3"]],
     ]);
   });

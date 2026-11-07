@@ -238,7 +238,35 @@ export function TaskMatches(props: {
         </div>
       )}
 
-      {(noMatch || suggestion?.method === "AI_GUESS") && (
+      {/* Any matched Task, reliable match or not (specs/feature-matching "AI estimate on any
+          matched Task"); hours are rounds × these minutes. */}
+      {canEdit && suggestion && matching.aiGuesses && (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className={ui.label}>
+            Minutes per round
+            <input
+              type="number"
+              min={1}
+              max={480}
+              step={1}
+              inputMode="numeric"
+              className={`${ui.input} min-h-9 w-28`}
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className={ui.smallButton}
+            disabled={pending}
+            onClick={() => act(() => aiGuessAction(props.requestId, props.taskId, Number(minutes)))}
+          >
+            {suggestion.method === "AI_GUESS" ? "Estimate again" : "AI estimate"}
+          </button>
+        </div>
+      )}
+
+      {suggestion && !suggestion.reliableMatch && (
         <div className="mt-2 flex flex-col gap-2">
           {waiting && (
             <p className="text-info" data-testid="waiting-reference">
@@ -260,35 +288,8 @@ export function TaskMatches(props: {
               >
                 Ask an Architect
               </button>
-              {matching.aiGuesses ? (
-                <>
-                  {/* Hours are rounds × these minutes (specs/feature-matching). */}
-                  <label className={ui.label}>
-                    Minutes per round
-                    <input
-                      type="number"
-                      min={1}
-                      max={480}
-                      step={1}
-                      inputMode="numeric"
-                      className={`${ui.input} min-h-9 w-28`}
-                      value={minutes}
-                      onChange={(e) => setMinutes(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className={ui.smallButton}
-                    disabled={pending}
-                    onClick={() =>
-                      act(() => aiGuessAction(props.requestId, props.taskId, Number(minutes)))
-                    }
-                  >
-                    {suggestion?.method === "AI_GUESS" ? "Guess again" : "AI guess"}
-                  </button>
-                </>
-              ) : (
-                <span className="self-center text-muted">AI guesses aren&apos;t set up</span>
+              {!matching.aiGuesses && (
+                <span className="self-center text-muted">AI estimates aren&apos;t set up</span>
               )}
             </div>
           )}

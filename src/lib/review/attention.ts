@@ -74,7 +74,7 @@ export function matchingGroups(input: {
     ...group(
       "ai-guess",
       input.aiGuess,
-      (n) => `${count(n, "Task uses", "Tasks use")} an AI guess`,
+      (n) => `${count(n, "Task uses", "Tasks use")} an AI estimate`,
       (name) => `"${name}": AI-generated, no historical reference`,
     ),
     ...group(

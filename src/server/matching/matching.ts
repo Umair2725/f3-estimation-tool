@@ -39,9 +39,22 @@ export const ADJUST_REASON_REQUIRED = "Say why you're adjusting this suggestion"
 export const CHOOSE_ARCHITECT = "Choose an Architect";
 export const DECLINE_REASON_REQUIRED = "Say why you're declining";
 const NOTHING_TO_ACCEPT = "There are no suggested hours to accept for this Task";
+const FIND_MATCHES_FIRST = "Find matches for this Task first";
+export const AI_ESTIMATES_OFF = "AI estimates aren't set up";
 
 export function getEmbedder() {
   return embedderFor(getEnv());
+}
+
+/**
+ * Whether a Task's stored matches include a reliable one. Decided from the matches, not the
+ * suggestion's method: an AI estimate can replace a reliable match (specs/feature-matching
+ * "AI estimate on any matched Task").
+ */
+function hasReliableMatch(matches: Prisma.JsonValue) {
+  return (
+    chooseSuggestion(matches as unknown as Match[], getEmbedder().threshold).method !== "NO_MATCH"
+  );
 }
 
 // ---------- tasks ----------
@@ -141,6 +154,8 @@ export type SuggestionView = {
   /** AI guesses only: the minutes per round used and the biggest risks. */
   minutesPerRound: number | null;
   risks: string[];
+  /** Some stored match reaches the threshold; Ask an Architect is only offered without one. */
+  reliableMatch: boolean;
   decision: "PENDING" | "ACCEPTED" | "ADJUSTED" | "REJECTED";
   reason: string | null;
   decidedByName: string | null;
@@ -200,6 +215,7 @@ export async function getMatching(
         maxTenths: s.suggestedMaxTenths,
         minutesPerRound: s.minutesPerRound,
         risks: s.method === "AI_GUESS" ? s.guessRisks : [],
+        reliableMatch: hasReliableMatch(s.matches),
         decision: s.decision,
         reason: s.reason,
         decidedByName: s.decidedBy?.name ?? null,
@@ -273,7 +289,7 @@ export async function decideSuggestion(
     const suggestion = await tx.taskSuggestion.findFirst({
       where: { taskId, task: { requestPart: { requestId } } },
     });
-    if (!suggestion) throw new ServiceError("Find matches for this Task first", 400);
+    if (!suggestion) throw new ServiceError(FIND_MATCHES_FIRST, 400);
     const suggested = suggestion.suggested as unknown as SuggestedSubTask[] | null;
     if (decision !== "REJECTED") {
       if (!suggested?.length) throw new ServiceError(NOTHING_TO_ACCEPT, 400);
@@ -295,7 +311,7 @@ export async function requestAiGuess(
   minutesPerRound: unknown,
 ) {
   assertAccess(actor, "estimate.edit");
-  if (!aiGuessesEnabled()) throw new ServiceError("AI guesses aren't set up", 400);
+  if (!aiGuessesEnabled()) throw new ServiceError(AI_ESTIMATES_OFF, 400);
   // Checked before anything else, so a bad value never reaches the AI or changes the Task.
   const minutes = minutesPerRoundSchema.safeParse(minutesPerRound);
   if (!minutes.success) {
@@ -307,10 +323,10 @@ export async function requestAiGuess(
   const request = await db.$transaction((tx) => loadForEdit(tx, actor, requestId));
   const [task] = await loadTasks(db, requestId, [taskId]);
   if (!task) throw new ServiceError("Task not found", 404);
+  // Any matched Task, reliable match or not; the stored matches stay (specs/feature-matching
+  // "AI estimate on any matched Task").
   const current = await db.taskSuggestion.findUnique({ where: { taskId } });
-  if (!current || (current.method !== "NO_MATCH" && current.method !== "AI_GUESS")) {
-    throw new ServiceError("AI guesses are only for Tasks with no reliable match", 400);
-  }
+  if (!current) throw new ServiceError(FIND_MATCHES_FIRST, 400);
   let guessed: SizedGuess;
   try {
     guessed = await guessSubTasks(request, task, minutes.data);
@@ -464,7 +480,7 @@ export async function askArchitect(
     const [task] = await loadTasks(tx, requestId, [taskId]);
     if (!task) throw new ServiceError("Task not found", 404);
     const suggestion = await tx.taskSuggestion.findUnique({ where: { taskId } });
-    if (!suggestion || (suggestion.method !== "NO_MATCH" && suggestion.method !== "AI_GUESS")) {
+    if (!suggestion || hasReliableMatch(suggestion.matches)) {
       throw new ServiceError("Ask an Architect only when there is no reliable match", 400);
     }
     if (await tx.referenceRequest.count({ where: { taskId, status: "OPEN" } })) {

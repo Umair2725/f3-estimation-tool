@@ -176,12 +176,12 @@ export function DefaultsForm({ initial }: { initial: EstimateDefaults }) {
 
       <section aria-labelledby="ai-guess-title" className={`${ui.card} p-5`}>
         <h2 id="ai-guess-title" className="text-lg font-bold">
-          AI guess
+          AI estimate
         </h2>
         <p className="mt-1 text-sm text-muted">
-          An AI guess estimates each Sub task in rounds (one think, write, run and fix cycle). Hours
+          An AI estimate sizes each Sub task in rounds (one think, write, run and fix cycle). Hours
           are rounds × minutes per round. This value pre-fills the estimator&apos;s field and sizes
-          the guesses made when features are added from a document.
+          the estimates made when features are added from a document.
         </p>
         <div className="mt-4 flex flex-col gap-1">
           <label htmlFor="minutes-per-round" className="text-sm font-semibold">

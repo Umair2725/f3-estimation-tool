@@ -63,7 +63,7 @@ test("the Admin finds matches and accepts one from Field service app", async ({ 
   );
 });
 
-test("a Task with no match gets an AI guess sized in rounds", async ({ browser }) => {
+test("a Task with no match gets an AI estimate sized in rounds", async ({ browser }) => {
   // The stub guess (AI_GUESS=stub): Core logic 4 rounds at High risk, Screens 2 rounds at Low.
   const page = await as(browser, "admin");
   await page.goto(`${requestUrl}/estimate`);
@@ -73,12 +73,12 @@ test("a Task with no match gets an AI guess sized in rounds", async ({ browser }
   await expect(minutes).toHaveValue("60");
 
   await minutes.fill("0");
-  await task.getByRole("button", { name: "AI guess" }).click();
+  await task.getByRole("button", { name: "AI estimate" }).click();
   await expect(task.getByText("Enter whole minutes from 1 to 480")).toBeVisible();
   await expect(task.getByTestId("suggestion-line")).toContainText("No reliable match");
 
   await minutes.fill("60");
-  await task.getByRole("button", { name: "AI guess" }).click();
+  await task.getByRole("button", { name: "AI estimate" }).click();
   const guess = task.getByTestId("ai-guess");
   await expect(guess).toContainText(
     "4–6 rounds × 60 min, High risk: Third-party API is undocumented",
@@ -91,11 +91,33 @@ test("a Task with no match gets an AI guess sized in rounds", async ({ browser }
   // 4–6 h + 2–2 h + integration 0.9–1.2 h.
   await expect(task.getByTestId("suggestion-line")).toContainText("6.9–9.2 h");
 
-  // Guess again at 30 minutes per round halves the hours.
+  // Estimate again at 30 minutes per round halves the hours.
   await task.getByLabel("Minutes per round").fill("30");
-  await task.getByRole("button", { name: "Guess again" }).click();
+  await task.getByRole("button", { name: "Estimate again" }).click();
   await expect(task.getByTestId("ai-guess")).toContainText("4–6 rounds × 30 min");
   await expect(task.getByTestId("suggestion-line")).toContainText("3.5–4.6 h");
+});
+
+test("a Task with a reliable match can get an AI estimate too", async ({ browser }) => {
+  const page = await as(browser, "admin");
+  await page.goto(`${requestUrl}/estimate`);
+  const work = page.getByRole("region", { name: "Task Work orders" });
+  await expect(work.getByRole("button", { name: "Ask an Architect" })).toHaveCount(0);
+  await work.getByRole("button", { name: "AI estimate" }).click();
+  await expect(work.getByTestId("suggestion-line")).toContainText(
+    "AI-generated, no historical reference",
+  );
+  await expect(work.getByTestId("ai-guess")).toContainText("4–6 rounds × 60 min");
+  // The match stays listed, the accepted Sub tasks stay, and no Architect is offered.
+  await work.getByText(/^Similar past work/).click();
+  await expect(work.getByTestId("matches-table")).toContainText("Field service app");
+  await expect(work.getByLabel("Sub task title in Work orders").first()).toHaveValue(
+    "Work order API and sync",
+  );
+  await expect(work.getByRole("button", { name: "Ask an Architect" })).toHaveCount(0);
+
+  await work.getByRole("button", { name: "Find again" }).click();
+  await expect(work.getByTestId("suggestion-line")).toContainText("Based on actual hours (AI era)");
 });
 
 test("a Task with no match goes to an Architect", async ({ browser }) => {
