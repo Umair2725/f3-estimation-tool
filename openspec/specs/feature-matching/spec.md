@@ -92,15 +92,15 @@ Every suggested number SHALL either cite at least one source or be labelled "AI-
 - **THEN** it shows the source and "Pre-AI hours: the AI reduction isn't applied yet"
 
 ### Requirement: No reliable match
-When no entry reaches the similarity threshold, the Task SHALL be marked "No reliable match" and no historical numbers SHALL be shown as a suggestion. The editor SHALL be offered to ask an Architect for reference hours and, if an AI provider key is configured, to get an AI-only guess labelled "AI-generated, no historical reference" wherever it appears. Without a key, the tool SHALL say AI guesses aren't set up.
+When no entry reaches the similarity threshold, the Task SHALL be marked "No reliable match" and no historical numbers SHALL be shown as a suggestion. The editor SHALL be offered to ask an Architect for reference hours and, if an AI provider key is configured, an AI estimate (see "AI estimate on any matched Task") labelled "AI-generated, no historical reference" wherever it appears. Without a key, the tool SHALL say AI estimates aren't set up.
 
 #### Scenario: Guess with a key
-- **WHEN** a Task has no reliable match and the estimator asks for an AI guess
-- **THEN** proposed Sub tasks with Min and Max appear, labelled "AI-generated, no historical reference"
+- **WHEN** a Task has no reliable match and the estimator clicks "AI estimate" with 60 minutes per round
+- **THEN** proposed Sub tasks with Min and Max appear, labelled "AI-generated, no historical reference", each showing its rounds, the 60 minutes per round and its risk level, with the estimate's biggest risks below them
 
 #### Scenario: No key
 - **WHEN** no AI provider key is configured
-- **THEN** the Task shows "No reliable match", the option to ask an Architect, and "AI guesses aren't set up"
+- **THEN** the Task shows "No reliable match", the option to ask an Architect, and "AI estimates aren't set up"
 
 ### Requirement: Ask an Architect for reference hours
 For a Task with no reliable match, people who may edit the request SHALL be able to ask an active Architect for reference hours, with an optional note. The request for reference SHALL record the feature name and description, part and stack, who asked, the Architect and when; the Architect SHALL be notified in the app. While it is open, the Task SHALL show "Waiting for <Architect>'s reference", and the same Task SHALL NOT have two open requests.
@@ -166,11 +166,15 @@ Each decision SHALL be stored with its method, the sources with their similarity
 - **THEN** the stored decision is Adjusted, with that reason, the method, the sources and the estimator's name and time
 
 ### Requirement: Review attention for suggestions
-The review page's items needing attention SHALL also list Tasks whose accepted suggestion was an AI-only guess ("AI guess"), Tasks marked "No reliable match" that have no Sub tasks with hours, and Tasks still waiting for an Architect's reference, each with a count and a link to the Task.
+The review page's items needing attention SHALL also list Tasks whose accepted suggestion was an AI estimate, Tasks marked "No reliable match" that have no Sub tasks with hours, and Tasks still waiting for an Architect's reference, each with a count and a link to the Task.
 
 #### Scenario: AI guess flagged
-- **WHEN** a request with one accepted AI guess is in review
-- **THEN** the items needing attention include "1 Task uses an AI guess" with a link to it
+- **WHEN** a request with one accepted AI estimate is in review
+- **THEN** the items needing attention include "1 Task uses an AI estimate" with a link to it
+
+#### Scenario: AI estimate over a reliable match flagged
+- **WHEN** the estimator accepts an AI estimate that replaced a Confirmed benchmark suggestion, and the request goes to review
+- **THEN** the items needing attention include "1 Task uses an AI estimate"
 
 ### Requirement: Privacy of AI calls
 Only the request's own project details and feature text SHALL be sent to the AI provider for a guess; other requests' estimates, Architect references and client names SHALL NOT be sent. AI calls SHALL use the configured, approved provider only, and the key SHALL be read from the server's settings, never shown in the interface.
@@ -178,3 +182,86 @@ Only the request's own project details and feature text SHALL be sent to the AI 
 #### Scenario: Guess prompt
 - **WHEN** an AI guess is requested for "Offline sync" on a Northwind request
 - **THEN** the text sent contains that request's feature, part and stack, and no other request's project, client or hours
+
+### Requirement: Minutes per round for an AI guess
+Asking for an AI guess or a new guess SHALL require minutes per round, a whole number from 1 to 480, pre-filled with the default minutes per round (specs/estimate-defaults "Default minutes per round"). Guesses made when features are added from a requirement document SHALL use the default. The minutes per round used SHALL be stored with the guess.
+
+#### Scenario: Pre-filled
+- **WHEN** the default minutes per round is 60 and the estimator opens the AI guess option
+- **THEN** the minutes per round field shows 60 and can be changed before guessing
+
+#### Scenario: Invalid minutes
+- **WHEN** the estimator asks for a guess with 0 or 30.5 minutes per round
+- **THEN** it is refused with "Enter whole minutes from 1 to 480" and the Task is unchanged
+
+#### Scenario: Document fill uses the default
+- **WHEN** features are added from a requirement document and one has no reliable match, while the default is 45
+- **THEN** its AI guess is sized at 45 minutes per round
+
+### Requirement: How an AI guess is sized
+An AI guess SHALL give each Sub task a kind of work (Boilerplate 1–2 rounds, Moderate 3–5, Exploratory 5–10, High uncertainty 8–15), whole base rounds from 1 to 15, and a risk level (Low 1.0, Medium 1.3, High 1.5, Very high 2.0) with a one-line reason when above Low; the AI SHALL NOT give hours. Min SHALL be base rounds and Max base rounds times the risk factor, each converted as rounds × minutes per round ÷ 60 and rounded to tenths of an hour.
+
+#### Scenario: Hours from rounds and risk
+- **WHEN** the AI gives a Sub task 4 base rounds with High risk "SDK docs are sparse" and the minutes per round is 60
+- **THEN** the Sub task is 4–6 h and its comment is "AI-generated, no historical reference · 4–6 rounds × 60 min, High risk: SDK docs are sparse"
+
+#### Scenario: Low risk needs no reason
+- **WHEN** the AI gives a Sub task 2 base rounds with Low risk and the minutes per round is 30
+- **THEN** the Sub task is 1–1 h and its comment is "AI-generated, no historical reference · 2 rounds × 30 min, Low risk"
+
+#### Scenario: Fractional effective rounds
+- **WHEN** the AI gives a Sub task 3 base rounds with Medium risk and the minutes per round is 60
+- **THEN** the Sub task is 3–3.9 h
+
+#### Scenario: Answer without a reason
+- **WHEN** the AI gives a Sub task a risk above Low without a reason, or rounds outside 1 to 15
+- **THEN** the estimate fails with "The AI estimate failed. Try again." and the Task keeps its current suggestion and Sub tasks
+
+### Requirement: Integration Sub task in an AI guess
+An AI guess with 2 or more Sub tasks SHALL get one more Sub task, "Integration and wiring", whose Min is 15% of the other Sub tasks' total base rounds and whose Max is 15% of their total effective rounds, converted to hours with the same minutes per round and commented "AI-generated, no historical reference · Integration, 15% of rounds". A guess with one Sub task SHALL get none.
+
+#### Scenario: Integration added
+- **WHEN** a guess's Sub tasks total 10 base rounds and 14 effective rounds at 60 minutes per round
+- **THEN** the guess also has "Integration and wiring" at 1.5–2.1 h
+
+#### Scenario: Single Sub task
+- **WHEN** a guess has only one Sub task
+- **THEN** no integration Sub task is added
+
+### Requirement: Biggest risks of an AI guess
+An AI guess SHALL return up to 3 biggest risks, each one sentence, stored with the suggestion and shown under the guess on the Estimate tab while it is the Task's suggestion. Each guessed Sub task's kind of work, base rounds, risk level and reason SHALL also be stored with the suggestion, so they can later be compared with actual hours.
+
+#### Scenario: Risks shown
+- **WHEN** a guess returns the risk "Client's offline conflict rules are unknown"
+- **THEN** the Estimate tab shows it under the guess's Sub tasks, labelled "Biggest risks"
+
+#### Scenario: Guess again replaces the guess
+- **WHEN** the estimator clicks "Estimate again" with 90 minutes per round
+- **THEN** the new estimate's Sub tasks, rounds, risks and the 90 minutes per round replace the old ones
+
+### Requirement: AI estimate on any matched Task
+When AI estimates are set up, people who may edit the request SHALL be offered "AI estimate", with minutes per round, on every Task that has a suggestion, whether or not it has a reliable match. It SHALL replace the Task's suggestion with an AI estimate, sized and labelled as for "No reliable match", without changing the Task's Sub tasks until Accept or Adjust. The similar past work list SHALL stay. "Find again" SHALL bring back the knowledge-base suggestion.
+
+#### Scenario: Estimate over a reliable match
+- **WHEN** a Task's suggestion is the Confirmed benchmark FB-012 at 16–24 h and the estimator clicks "AI estimate" with 60 minutes per round
+- **THEN** the suggestion becomes the AI estimate labelled "AI-generated, no historical reference", the similar past work still lists FB-012, and the Task's Sub tasks are unchanged
+
+#### Scenario: Accepted match then AI estimate
+- **WHEN** the estimator has accepted a match and then asks for an AI estimate
+- **THEN** the Task keeps the accepted Sub tasks, and the AI estimate waits for Accept, Adjust or Reject
+
+#### Scenario: Find again restores the match
+- **WHEN** the estimator clicks "Find again" on a Task whose AI estimate replaced FB-012
+- **THEN** the suggestion is FB-012 again
+
+#### Scenario: Not matched yet
+- **WHEN** a Task has never been matched
+- **THEN** only "Find matches" is offered, not "AI estimate"
+
+#### Scenario: Ask an Architect stays for no reliable match only
+- **WHEN** a Task's AI estimate replaced a reliable match
+- **THEN** "Ask an Architect" is not offered, and asking is refused with "Ask an Architect only when there is no reliable match"
+
+#### Scenario: Document fills unchanged
+- **WHEN** features with a reliable match are added from a requirement document
+- **THEN** their hours come from the match, not from an AI estimate

@@ -57,7 +57,7 @@
 
 - [x] 5.1 Update the AI guess description in `README.md` and `docs/product-brief.md`: rounds, risk, integration, minutes per round, the Admin default and the credit to agent-estimation. Verify that the docs mention minutes per round and no longer say the AI gives hours.
 - [x] 5.2 Run lint, the type check, the unit tests, the integration tests and `npm run build`, and verify that all pass.
-- [ ] 5.3 Smoke test with a real key: on a Task with no reliable match, guess at 60 and then at 30 minutes per round. Verify that the hours halve, that "Integration and wiring" is present, and that the review page still flags "uses an AI guess".
+- [x] 5.3 Smoke test with a real key: on a Task with no reliable match, guess at 60 and then at 30 minutes per round. Verify that the hours halve, that "Integration and wiring" is present, and that the review page still flags "uses an AI guess".
 
 ## Workflow follow-up
 
