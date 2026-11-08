@@ -425,7 +425,7 @@ Real estimates, SOWs and RFPs used for demos or imports go in **`/samples/`**, *
 ```
 src/app/            pages and API routes (Next.js App Router)
 src/app/(app)/      signed-in pages: home, estimates (wizard, request page), settings
-src/app/sign-in/    sign-in page
+src/app/sign-in/    sign-in page: product tour (left, wide screens only, demo data) and Google sign-in (right)
 src/app/api/        health check, auth (Better Auth), people API
 src/components/     brand and app shell (sidebar, top bar)
 src/lib/            settings (env), logger, estimation options and validation

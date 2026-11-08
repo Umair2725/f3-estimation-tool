@@ -55,12 +55,43 @@ test("sign-in page fits a phone and follows dark mode", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { name: "Sign in to F3 Estimation Tool" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
+  // The product tour is for wide screens only.
+  await expect(page.getByRole("region", { name: "Product tour" })).toBeHidden();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     "rgb(20, 21, 23)",
+  );
+});
+
+test("the sign-in page shows an interactive product tour on wide screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/sign-in");
+  const tour = page.getByRole("region", { name: "Product tour" });
+  await expect(tour).toBeVisible();
+
+  await tour.getByRole("tab", { name: "Mobile (Flutter)" }).click();
+  await expect(tour.getByRole("tab", { name: "Mobile (Flutter)" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await tour.getByRole("row", { name: /Offline sync/ }).click();
+  await expect(tour.getByText("Benchmark", { exact: true }).last()).toBeVisible();
+
+  await tour.getByRole("row", { name: /Work orders/ }).click();
+  await expect(tour.getByText("AI-generated, no historical reference")).toBeVisible();
+  await tour.getByRole("slider", { name: "Minutes per round" }).fill("90");
+  await expect(tour.getByText("90 min")).toBeVisible();
+  await expect(tour.getByRole("row", { name: /Work orders/ })).toContainText("20–26 h");
+
+  await tour.getByRole("button", { name: /Review & export/ }).click();
+  await expect(tour.getByText("Export to Excel ↓")).toBeVisible();
+
+  await expect(page.getByRole("link", { name: "khanumair@folio3.com" })).toHaveAttribute(
+    "href",
+    "mailto:khanumair@folio3.com",
   );
 });
