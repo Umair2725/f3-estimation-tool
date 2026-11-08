@@ -33,7 +33,7 @@ The prototype is a single self-contained HTML file with **fictional demo data** 
 
 | # | Screen | Who | Brief features |
 |---|---|---|---|
-| 1 | **Sign in**: Google, `@folio3.com` only | Everyone | F-01 |
+| 1 | **Sign in**: Google, `@folio3.com` only. Split screen: an interactive product tour with demo data on the left (wide screens only), sign-in on the right, and an access contact in the footer | Everyone | F-01 |
 | 2 | **Home**: drafts, reviews waiting, "continue where you left off", all requests with status filters | Everyone | F-02 |
 | 3 | **New estimation request**: 4-step wizard (Project → Platforms & stack → Environment & compliance → Requirements); PDF/DOCX upload with extracted features, each quoted with its page number | Estimator | F-03, F-09 |
 | 4 | **Estimate workspace**: features by part (tabs), a source badge on every number, Accept / Adjust / Remove, Team experience switch, live totals (development + 10% bugs + QA 25% + PM 30%, rate, cost), pre-submit checklist | Estimator | F-04, F-05, F-07, F-24 |

@@ -55,8 +55,10 @@ export function SignInPanel(props: {
   return (
     <div className="flex w-full max-w-sm flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Sign in to F3 Estimation Tool</h1>
-        <p className="mt-1.5 text-muted">Use your Folio3 Google account. No new password needed.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight">Welcome back</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-muted">
+          Sign in with your Folio3 Google account. No new password needed.
+        </p>
       </div>
 
       {error && (
@@ -69,7 +71,7 @@ export function SignInPanel(props: {
         type="button"
         onClick={google}
         disabled={busy || !props.googleEnabled}
-        className="flex min-h-12 items-center justify-center gap-3 rounded-full border border-border-strong bg-surface px-5 font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex min-h-13 items-center justify-center gap-3 rounded-full border border-border-strong bg-surface px-5 text-[15px] font-bold transition hover:bg-surface-2 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         Continue with Google
@@ -80,56 +82,67 @@ export function SignInPanel(props: {
         </p>
       )}
 
-      <p className="rounded-lg bg-info-bg px-3.5 py-3 text-sm text-info">
-        Only <strong>@folio3.com</strong> accounts can sign in. An Admin assigns your role after
-        your first sign-in.
+      <p className="flex gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-sm leading-relaxed text-foreground-2">
+        <LockIcon />
+        <span>
+          Only <strong>@folio3.com</strong> accounts can sign in. An Admin assigns your role after
+          your first sign-in.
+        </span>
       </p>
 
       {props.devLogin && (
-        <form
-          onSubmit={devSignIn}
-          className="flex flex-col gap-3 rounded-xl border border-dashed border-border-strong p-4"
-          aria-labelledby="dev-signin-title"
+        <details
+          open
+          className="group mt-2 rounded-xl border border-dashed border-border-strong p-4"
         >
-          <h2 id="dev-signin-title" className="text-sm font-bold">
-            Development sign-in
-          </h2>
-          <p className="text-xs text-muted">
-            Local development and tests only. Never available in production.
-          </p>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Test user
-            <select
-              className="min-h-10 rounded-lg border border-border-strong bg-surface px-3 font-normal"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            >
-              {DEV_USERS.map((u) => (
-                <option key={u.email} value={u.email}>
-                  {u.label} ({u.email})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Password
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="min-h-10 rounded-lg border border-border-strong bg-surface px-3 font-normal"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-10 rounded-full bg-brand-strong px-5 font-semibold text-white disabled:opacity-60"
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-bold">
+            <h2 id="dev-signin-title">Development sign-in</h2>
+            <span aria-hidden="true" className="text-muted group-open:rotate-180">
+              ▾
+            </span>
+          </summary>
+          <form
+            onSubmit={devSignIn}
+            className="mt-3 flex flex-col gap-3"
+            aria-labelledby="dev-signin-title"
           >
-            Sign in as test user
-          </button>
-        </form>
+            <p className="text-xs text-muted">
+              Local development and tests only. Never available in production.
+            </p>
+            <label className="flex flex-col gap-1 text-sm font-semibold">
+              Test user
+              <select
+                className="min-h-10 rounded-lg border border-border-strong bg-surface px-3 font-normal"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              >
+                {DEV_USERS.map((u) => (
+                  <option key={u.email} value={u.email}>
+                    {u.label} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold">
+              Password
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                className="min-h-10 rounded-lg border border-border-strong bg-surface px-3 font-normal"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              className="min-h-10 rounded-full bg-brand-strong px-5 font-semibold text-white disabled:opacity-60"
+            >
+              Sign in as test user
+            </button>
+          </form>
+        </details>
       )}
     </div>
   );
@@ -144,6 +157,24 @@ function devSignInError(err: { status?: number; code?: string; message?: string 
   }
   if (err.status === 401) return "Email or password is wrong.";
   return "Sign-in didn't work. Please try again.";
+}
+
+function LockIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className="mt-0.5 flex-none text-muted"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
 }
 
 function GoogleIcon() {
