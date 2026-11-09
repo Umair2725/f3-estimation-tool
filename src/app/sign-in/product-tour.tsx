@@ -342,7 +342,7 @@ export function ProductTour() {
                     </strong>
                   </div>
                   <div>
-                    <small>Bugs 10% · QA 25% · PM 30%</small>
+                    <small title="Bugs 10%, QA 25%, PM 30%">Bugs + QA + PM</small>
                     <strong>
                       <CountUp value={totals.overheads} reduced={reduced} />
                     </strong>
