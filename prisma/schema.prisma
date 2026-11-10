@@ -336,7 +336,7 @@ model EstimateDefaults {
   defaultRate   Int      @default(30) @map("default_rate")
   approvedRates Int[]    @default([25, 30, 35, 40, 45, 50]) @map("approved_rates")
   // Pre-fills the AI guess's minutes per round (specs/estimate-defaults).
-  minutesPerRound Int    @default(60) @map("minutes_per_round")
+  minutesPerRound Int    @default(6) @map("minutes_per_round")
   updatedAt     DateTime @updatedAt @map("updated_at")
   updatedById   String?  @map("updated_by_id")
 

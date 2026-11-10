@@ -63,7 +63,7 @@ const FALLBACK: EstimateDefaults = {
   bugFixPercent: 10,
   defaultRate: 30,
   approvedRates: [25, 30, 35, 40, 45, 50],
-  minutesPerRound: 60,
+  minutesPerRound: 6,
 };
 
 /** Current defaults; the brief's values if the row is somehow missing. No access check. */

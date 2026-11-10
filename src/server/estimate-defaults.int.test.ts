@@ -42,7 +42,7 @@ describe("estimate defaults (specs/estimate-defaults)", () => {
       bugFixPercent: 10,
       defaultRate: 30,
       approvedRates: [25, 30, 35, 40, 45, 50],
-      minutesPerRound: 60,
+      minutesPerRound: 6,
     });
   });
 

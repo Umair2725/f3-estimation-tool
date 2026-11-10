@@ -187,8 +187,8 @@ Only the request's own project details and feature text SHALL be sent to the AI 
 Asking for an AI guess or a new guess SHALL require minutes per round, a whole number from 1 to 480, pre-filled with the default minutes per round (specs/estimate-defaults "Default minutes per round"). Guesses made when features are added from a requirement document SHALL use the default. The minutes per round used SHALL be stored with the guess.
 
 #### Scenario: Pre-filled
-- **WHEN** the default minutes per round is 60 and the estimator opens the AI guess option
-- **THEN** the minutes per round field shows 60 and can be changed before guessing
+- **WHEN** the default minutes per round is 6 and the estimator opens the AI guess option
+- **THEN** the minutes per round field shows 6 and can be changed before guessing
 
 #### Scenario: Invalid minutes
 - **WHEN** the estimator asks for a guess with 0 or 30.5 minutes per round
@@ -197,6 +197,17 @@ Asking for an AI guess or a new guess SHALL require minutes per round, a whole n
 #### Scenario: Document fill uses the default
 - **WHEN** features are added from a requirement document and one has no reliable match, while the default is 45
 - **THEN** its AI guess is sized at 45 minutes per round
+
+### Requirement: Progress while an AI estimate runs
+While an AI estimate the estimator asked for is running, the Task SHALL show a spinner with "Claude is estimating this Task…", and its "AI estimate" or "Estimate again" button SHALL read "Estimating…". The Task's other match actions SHALL be disabled until the estimate ends. When it ends, the progress SHALL be replaced by the estimate or the error.
+
+#### Scenario: Estimating
+- **WHEN** the estimator clicks "AI estimate" and Claude has not answered yet
+- **THEN** the Task shows the spinner and "Claude is estimating this Task…", and Accept, Find again and the button are disabled
+
+#### Scenario: Estimate ends
+- **WHEN** Claude answers, or the estimate is refused
+- **THEN** the spinner is gone and the estimate's Sub tasks, or the error, are shown
 
 ### Requirement: How an AI guess is sized
 An AI guess SHALL give each Sub task a kind of work (Boilerplate 1–2 rounds, Moderate 3–5, Exploratory 5–10, High uncertainty 8–15), whole base rounds from 1 to 15, and a risk level (Low 1.0, Medium 1.3, High 1.5, Very high 2.0) with a one-line reason when above Low; the AI SHALL NOT give hours. Min SHALL be base rounds and Max base rounds times the risk factor, each converted as rounds × minutes per round ÷ 60 and rounded to tenths of an hour.
