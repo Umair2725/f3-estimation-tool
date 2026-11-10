@@ -37,7 +37,7 @@ afterEach(async () => {
   // One test changes the default minutes per round; put the starting value back.
   await getDb().estimateDefaults.update({
     where: { id: "default" },
-    data: { minutesPerRound: 60 },
+    data: { minutesPerRound: 6 },
   });
 });
 afterAll(async () => {
@@ -536,7 +536,7 @@ describe("AI guess", () => {
       },
     ]);
     const view = await getMatching(owner, id);
-    expect(view.defaultMinutesPerRound).toBe(60);
+    expect(view.defaultMinutesPerRound).toBe(6);
     const guessed = view.byTask[task.taskId].suggestion!;
     expect(guessed).toMatchObject({
       method: "AI_GUESS",

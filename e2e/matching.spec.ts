@@ -70,7 +70,7 @@ test("a Task with no match gets an AI estimate sized in rounds", async ({ browse
   const task = page.getByRole("region", { name: `Task ${unknown}` });
   await expect(task.getByTestId("suggestion-line")).toContainText("No reliable match");
   const minutes = task.getByLabel("Minutes per round");
-  await expect(minutes).toHaveValue("60");
+  await expect(minutes).toHaveValue("6");
 
   await minutes.fill("0");
   await task.getByRole("button", { name: "AI estimate" }).click();
@@ -78,8 +78,19 @@ test("a Task with no match gets an AI estimate sized in rounds", async ({ browse
   await expect(task.getByTestId("suggestion-line")).toContainText("No reliable match");
 
   await minutes.fill("60");
+  // Slow the server action down so the progress shows while the estimate runs.
+  await page.route(`**${requestUrl}/estimate`, async (route) => {
+    if (route.request().method() === "POST") await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
   await task.getByRole("button", { name: "AI estimate" }).click();
+  await expect(task.getByTestId("ai-estimating")).toHaveText("Claude is estimating this Task…");
+  await expect(task.getByRole("button", { name: "Estimating…" })).toBeDisabled();
+  await expect(task.getByRole("button", { name: "Find again" })).toBeDisabled();
   const guess = task.getByTestId("ai-guess");
+  await expect(guess).toBeVisible();
+  await expect(task.getByTestId("ai-estimating")).toHaveCount(0);
+  await page.unrouteAll();
   await expect(guess).toContainText(
     "4–6 rounds × 60 min, High risk: Third-party API is undocumented",
   );
@@ -107,7 +118,7 @@ test("a Task with a reliable match can get an AI estimate too", async ({ browser
   await expect(work.getByTestId("suggestion-line")).toContainText(
     "AI-generated, no historical reference",
   );
-  await expect(work.getByTestId("ai-guess")).toContainText("4–6 rounds × 60 min");
+  await expect(work.getByTestId("ai-guess")).toContainText("4–6 rounds × 6 min");
   // The match stays listed, the accepted Sub tasks stay, and no Architect is offered.
   await work.getByText(/^Similar past work/).click();
   await expect(work.getByTestId("matches-table")).toContainText("Field service app");

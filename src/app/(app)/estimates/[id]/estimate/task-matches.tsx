@@ -45,7 +45,15 @@ export function TaskMatches(props: {
     String(suggestion?.minutesPerRound ?? matching.defaultMinutesPerRound),
   );
 
-  const act = (work: () => Promise<{ ok: boolean; message?: string }>) =>
+  // Which action is running, so an AI estimate can show its progress while `pending`.
+  const [running, setRunning] = useState<"ai" | "other">("other");
+
+  const act = (
+    work: () => Promise<{ ok: boolean; message?: string }>,
+    kind: "ai" | "other" = "other",
+  ) => {
+    setRunning(kind);
+    if (kind === "ai") setMessage(null);
     startTransition(async () => {
       const result = await work();
       setMessage({ ok: result.ok, text: result.message ?? "That didn't work." });
@@ -55,15 +63,22 @@ export function TaskMatches(props: {
         setReason("");
       }
     });
+  };
 
   const canEdit = matching.canEdit;
   if (!suggestion && !canEdit) return null;
   const blocked = props.dirty;
   const noMatch = suggestion?.method === "NO_MATCH";
   const waiting = ask?.status === "OPEN";
+  // specs/feature-matching "Progress while an AI estimate runs".
+  const estimating = pending && running === "ai";
 
   return (
-    <div className="border-t border-border px-4 py-3 text-sm" data-testid="task-matches">
+    <div
+      className="border-t border-border px-4 py-3 text-sm"
+      data-testid="task-matches"
+      aria-busy={estimating}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-semibold">Matches</span>
@@ -259,10 +274,29 @@ export function TaskMatches(props: {
             type="button"
             className={ui.smallButton}
             disabled={pending}
-            onClick={() => act(() => aiGuessAction(props.requestId, props.taskId, Number(minutes)))}
+            onClick={() =>
+              act(() => aiGuessAction(props.requestId, props.taskId, Number(minutes)), "ai")
+            }
           >
-            {suggestion.method === "AI_GUESS" ? "Estimate again" : "AI estimate"}
+            {estimating
+              ? "Estimating…"
+              : suggestion.method === "AI_GUESS"
+                ? "Estimate again"
+                : "AI estimate"}
           </button>
+          {estimating && (
+            <p
+              role="status"
+              className="flex items-center gap-2 self-center text-foreground-2"
+              data-testid="ai-estimating"
+            >
+              <span
+                aria-hidden
+                className="size-4 shrink-0 rounded-full border-2 border-border-strong border-t-brand motion-safe:animate-spin"
+              />
+              Claude is estimating this Task…
+            </p>
+          )}
         </div>
       )}
 
