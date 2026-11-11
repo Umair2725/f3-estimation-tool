@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
 import type { DocumentKind } from "@/generated/prisma/client";
+import { docxSections } from "@/lib/documents/docx-sections";
 import { proposalCounts, type Proposal } from "@/lib/documents/proposal";
 import type { TextLayer } from "@/lib/documents/quotes";
 import type { CurrentUser } from "@/server/auth/access";
@@ -22,36 +23,6 @@ export const TOO_LARGE = "Files can be up to 25 MB";
 export const KINDS: DocumentKind[] = ["CLIENT_REQUIREMENTS", "FOLIO3_SOW"];
 
 type Parsed = { format: "PDF" | "DOCX"; pageCount: number; textLayer: TextLayer };
-
-function stripTags(html: string): string {
-  return html
-    .replace(/<\/(p|li|tr|h[1-6])>/g, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/[ \t]+\n/g, "\n")
-    .trim();
-}
-
-/** Splits mammoth's HTML into sections at headings; text before the first heading is "Start". */
-export function docxSections(html: string): { heading: string; text: string }[] {
-  const sections: { heading: string; text: string }[] = [];
-  const parts = html.split(/(<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>)/);
-  let heading = "Start";
-  let body = "";
-  for (const part of parts) {
-    if (/^<h[1-6]/.test(part)) {
-      if (stripTags(body)) sections.push({ heading, text: stripTags(body) });
-      heading = stripTags(part) || "Untitled section";
-      body = "";
-    } else body += part;
-  }
-  if (stripTags(body) || sections.length === 0) sections.push({ heading, text: stripTags(body) });
-  return sections;
-}
 
 async function parseFile(bytes: Uint8Array): Promise<Parsed> {
   const head = Buffer.from(bytes.subarray(0, 5)).toString("latin1");

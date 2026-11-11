@@ -31,6 +31,10 @@ After upload, each document SHALL be read by Claude in the background: a PDF as 
 - **WHEN** Claude can't be reached or returns no usable answer
 - **THEN** the document shows "Failed" with the reason and a "Read again" button, and nothing is added to the request
 
+#### Scenario: Headings in a Word document
+- **WHEN** a DOCX has "Sign up" as a heading and "Forgot password" as a paragraph under it
+- **THEN** its text keeps every heading, including headings with no text under them, and Claude is told that a heading naming a capability is a feature, so both "Sign up" and "Forgot password" are proposed
+
 ### Requirement: Proposals cite their source
 Every proposed item SHALL cite its document, its page (or, for a DOCX, its section heading) and a short quote. Where the file has a text layer, the quote SHALL be checked against the document's own text and shown as "Quote checked"; otherwise it SHALL be shown as "Check the page". Items Claude is unsure of SHALL be flagged "Needs confirmation". Information the document doesn't give SHALL be left out, not guessed.
 

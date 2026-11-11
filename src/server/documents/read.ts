@@ -70,6 +70,7 @@ Rules:
 - Every item needs a cite: for a PDF, the 1-based page number and section ""; for a Word document, the section heading exactly as marked with [Section: ...] and page 0. The quote must be copied word for word from that page or section, at most 200 characters.
 - Set needsConfirmation to true when you are unsure the item is right or the document is ambiguous.
 - Features are user-facing capabilities or system functions worth estimating separately (for example "Appointment booking", "Admin user management"). Give each a short description and the parts it needs. Don't propose a feature the request already has.
+- In a Word document, a [Section: ...] heading is part of the document's text. A heading that names a capability (for example "Sign up") is a feature in its own right, even when the text under it is short, empty or about something else; propose it, quoting the heading. Headings that only organise the document (for example "Scope", "Features", "Introduction") are not features.
 - Request details: one entry per field you find. projectName and client take one value; the other fields take only the allowed values listed below.
 - Technologies: use the catalog names given for each part. A technology the document requires that isn't in the catalog goes in that part's note as "Document asks for <name> (not in the catalog)".
 - Notes: kind "assumption" for what the document assumes, kind "risk" for what could make the work larger, each for the part it mostly affects.
@@ -189,9 +190,12 @@ const stubReader: DocumentReader = async (input) => {
     questions: [],
   };
   for (const s of sections) {
-    const line = firstLine(s.text);
-    if (!line || s.heading === "Start") continue;
+    if (s.heading === "Start") continue;
     const lower = s.heading.toLowerCase();
+    const listHeading = /^(question|assumption|risk)/.test(lower);
+    // A feature heading with no text under it still names a feature; it cites the heading itself.
+    const line = firstLine(s.text) || (listHeading ? "" : s.heading);
+    if (!line) continue;
     if (lower.startsWith("question")) {
       reading.questions.push({ text: line, needsConfirmation: false, cite: cite(s, line) });
     } else if (lower.startsWith("assumption")) {
