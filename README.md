@@ -381,8 +381,8 @@ The benchmark library (**Knowledge base → Feature hours**) holds what common f
 | `check-env` | Validate settings |
 | `lint`, `format`, `format:check`, `typecheck` | Code quality |
 | `test` | Unit tests (Vitest) |
-| `test:int` | Integration tests against the database: sign-in, roles, people management. Needs a running, migrated database |
-| `test:e2e` | Browser tests (Playwright) for every role. Needs `npm run build` first and a running, migrated database; seeds the dev users itself. In CI the HTML report is kept for 30 days on every run (Actions → the run → Artifacts → `playwright-report`) |
+| `test:int` | Integration tests against the tests' own database: sign-in, roles, people management. Needs the database server running |
+| `test:e2e` | Browser tests (Playwright) for every role. Needs `npm run build` first and the database server running; seeds the dev users itself. In CI the HTML report is kept for 30 days on every run (Actions → the run → Artifacts → `playwright-report`) |
 | `db:deploy` | Apply migrations |
 | `db:seed` | Create or reset the development test users (needs `AUTH_DEV_LOGIN=1`) |
 | `db:migrate` | Create and apply a new migration during development |
@@ -392,6 +392,8 @@ The benchmark library (**Knowledge base → Feature hours**) holds what common f
 | `embeddings:download` | Download the local embedding model for matching (once; the Docker build does it) |
 | `reindex-knowledge` | Rebuild the matching index from approved estimates and Architect references. Safe to run repeatedly; the seed runs it too |
 | `backfill-approved` | Give approved requests from before the review workflow (imports) their approved version 1. Safe to run repeatedly; the seed runs it too |
+
+**Tests never touch your data.** Integration and browser tests use their own database, `f3_test` on the same server as `DATABASE_URL` (or `TEST_DATABASE_URL` when set). It is created, migrated and seeded automatically before each run, so the database in `DATABASE_URL` (your work, for example estimates made with `npm run dev`) is never written to. CI uses its own throwaway database.
 
 First time running end-to-end tests: `npx.cmd playwright install chromium`.
 

@@ -1,5 +1,7 @@
-// Integration tests use the local or CI database and the development sign-in.
-// Loads .env when present (local), then pins the settings these tests rely on.
+// Integration tests use the tests' own database (test/test-database.ts) and the development
+// sign-in. Loads .env when present (local), then pins the settings these tests rely on.
+import { testDatabaseUrl } from "./test-database";
+
 try {
   process.loadEnvFile();
 } catch {
@@ -7,6 +9,8 @@ try {
 }
 
 Object.assign(process.env, {
+  // Never the database in DATABASE_URL: it holds real work.
+  DATABASE_URL: testDatabaseUrl(process.env),
   NODE_ENV: "test",
   AUTH_DEV_LOGIN: "1",
   AUTH_URL: process.env.AUTH_URL || "http://localhost:3000",
@@ -21,9 +25,3 @@ Object.assign(process.env, {
   // Tests swap in a fake document reader; by default none is set up (no Claude calls).
   DOCUMENT_READER: "claude",
 });
-
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "Integration tests need DATABASE_URL (start the db with `docker compose up -d db`).",
-  );
-}

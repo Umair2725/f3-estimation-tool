@@ -1,11 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL, PORT } from "./e2e/helpers";
+import { testDatabaseUrl } from "./test/test-database";
+
+// E2E runs use the tests' own database, never the one in DATABASE_URL (it holds real work).
+// Workers and the seed helper inherit this; global setup creates, migrates and seeds it.
+try {
+  process.loadEnvFile();
+} catch {
+  // CI sets variables directly
+}
+process.env.DATABASE_URL = testDatabaseUrl(process.env);
 
 // End-to-end tests for the app-shell, system-health, authentication and user-roles specs.
 // They run against the production build (`npm run build` first) on port 3100. NODE_ENV=test
 // keeps the development sign-in available (it is refused when NODE_ENV=production).
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./test/prepare-test-database.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -37,6 +48,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
+      DATABASE_URL: process.env.DATABASE_URL,
       NODE_ENV: "test",
       AUTH_URL: BASE_URL,
       AUTH_DEV_LOGIN: "1",

@@ -16,17 +16,19 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
-          include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "scripts/**/*.test.ts", "test/**/*.test.ts"],
           exclude: ["**/*.int.test.ts"],
         },
       },
       {
-        // Integration tests run against the real database (DATABASE_URL), one file at a time.
+        // Integration tests run against the tests' own database (test/test-database.ts), one file
+        // at a time; global setup creates, migrates and seeds it first.
         resolve: { alias },
         test: {
           name: "integration",
           environment: "node",
           include: ["src/**/*.int.test.ts"],
+          globalSetup: ["./test/prepare-test-database.ts"],
           setupFiles: ["./test/integration-setup.ts"],
           fileParallelism: false,
           testTimeout: 20_000,
