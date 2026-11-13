@@ -102,7 +102,7 @@ A proposed feature whose name matches one already in the request, ignoring lette
 - **THEN** it is refused with "This request can no longer be edited" and nothing changes
 
 ### Requirement: After adding
-The added features SHALL get estimate Tasks and be matched at once. The document SHALL then show when and by whom its items were added, and SHALL be able to be reviewed and added again, with items already added shown as added.
+The added features SHALL get estimate Tasks and be matched at once, and the estimator SHALL be taken to the request's Estimate tab. The document SHALL then show when and by whom its items were added, and SHALL be able to be reviewed and added again, with items already added shown as added.
 
 #### Scenario: Matched straight away
 - **WHEN** 12 features have just been added from a document
@@ -111,6 +111,11 @@ The added features SHALL get estimate Tasks and be matched at once. The document
 #### Scenario: Review again
 - **WHEN** the estimator reopens the review of a document already added
 - **THEN** the items added earlier show "Added" and are unticked
+
+#### Scenario: Estimate tab opens after adding
+- **WHEN** the estimator clicks "Add to request" with 12 features ticked
+- **THEN** the request's Estimate tab opens with the Tasks of the 12 features
+- **AND** a Task with no reliable match offers "Ask an Architect" and, when AI guesses are set up, an AI guess
 
 ### Requirement: Documents stay private to the tool
 Documents SHALL be stored in the tool's database and sent only to the configured AI provider for reading. They SHALL never be included in exports, emails or logs. Deleting a request SHALL delete its documents.
@@ -122,3 +127,37 @@ Documents SHALL be stored in the tool's database and sent only to the configured
 #### Scenario: Request deleted
 - **WHEN** the owner deletes a Draft that has two documents
 - **THEN** both documents and their extraction results are deleted
+
+### Requirement: Removed features offered again
+A feature added earlier from a document but no longer in the request SHALL be offered again in the document's review, unticked and labelled "Removed from the request", instead of showing "Added". The review SHALL follow the feature each item was added as, so merged and renamed features still show "Added".
+
+#### Scenario: Feature removed after adding
+- **WHEN** the estimator added "Appointment booking" from a document, later removed it from the request, and reopens the review
+- **THEN** "Appointment booking" shows "Removed from the request", unticked, and ticking it and clicking "Add to request" adds it again
+
+#### Scenario: Merged features stay added
+- **WHEN** the estimator merges "Book appointment" and "Reschedule appointment" into "Appointment booking", adds it, and reopens the review
+- **THEN** both items show "Added", not "Removed from the request"
+
+#### Scenario: Added before the feature was recorded
+- **WHEN** an item was added before the review recorded which feature it became
+- **THEN** a feature with the item's name, ignoring letter case and surrounding spaces, counts as still in the request
+
+### Requirement: Hours filled in
+When features are added from a document, each of their new Tasks SHALL get hours at once: a reliable match's Sub tasks when the knowledge base has one, otherwise an AI guess when AI guesses are set up. Each SHALL be recorded as accepted by the person who added the items, and SHALL stay open to Adjust, Reject and editing. Tasks that already have Sub tasks SHALL NOT be changed.
+
+#### Scenario: Matched feature
+- **WHEN** a feature added from a document matches an approved estimate's Task
+- **THEN** its Task has that Task's Sub tasks and hours, each commented with the source, and the suggestion is recorded as Accepted by the person who added it
+
+#### Scenario: No match, AI set up
+- **WHEN** a feature added from a document has no reliable match and AI guesses are set up
+- **THEN** its Task has the AI guess's Sub tasks, each labelled "AI-generated, no historical reference", and the review lists it under "AI guess"
+
+#### Scenario: No match, no AI
+- **WHEN** a feature added from a document has no reliable match and AI guesses aren't set up, or the guess fails
+- **THEN** its Task stays "No reliable match" without hours, offering "Ask an Architect"
+
+#### Scenario: Where the hours came from
+- **WHEN** the Estimate tab opens after adding
+- **THEN** the notice counts the Tasks with hours from past estimates, from an AI guess, and still without hours

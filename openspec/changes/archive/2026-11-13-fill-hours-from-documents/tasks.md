@@ -12,5 +12,5 @@
 ## 3. Verification
 
 - [x] 3.1 Lint, typecheck, Prettier, unit, integration, build and e2e (the export filename test fails only in the cloud sandbox's browser, as before this change).
-- [ ] 3.2 On UAT with the Claude key set: add the features of a real SOW and check each Task has hours, from past estimates or an AI guess, and the review lists the AI guesses.
-- [ ] 3.3 Open a PR. Verify CI is green on the PR.
+- [x] 3.2 On UAT with the Claude key set: add the features of a real SOW and check each Task has hours, from past estimates or an AI guess, and the review lists the AI guesses.
+- [x] 3.3 Open a PR. Verify CI is green on the PR.
