@@ -136,7 +136,7 @@ The benchmark created from reference hours SHALL be indexed at once for all futu
 - **THEN** the estimator is notified with that reason and the Task shows "No reliable match" again with the option to ask
 
 ### Requirement: Accept, Adjust or Reject
-People who may edit the request SHALL be able to Accept, Adjust (with a required reason) or Reject each suggestion. Accept and Adjust SHALL replace the Task's Sub tasks with the suggestion's, each commented with its source ("From <project> v<version>, <part label>", "From benchmark <ID>") or "AI-generated, no historical reference", and then editable. Sub tasks from a benchmark SHALL stay linked to it. Nothing SHALL change the hours without one of these actions.
+People who may edit the request SHALL be able to Accept, Adjust (with a reason) or Reject each suggestion. Accept and Adjust SHALL replace the Task's Sub tasks with the suggestion's, each commented with its source ("From <project> v<version>, <part label>", "From benchmark <ID>") or "AI-generated, no historical reference", then editable. Benchmark Sub tasks SHALL stay linked. Only these actions and the hours filled in for features from a document (specs/requirement-documents) SHALL change hours.
 
 #### Scenario: Accept
 - **WHEN** the estimator accepts a pre-AI suggestion from "Patient portal MVP" v1

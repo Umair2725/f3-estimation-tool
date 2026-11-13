@@ -22,9 +22,9 @@
 ## 4. Verification
 
 - [x] 4.1 E2E with `DOCUMENT_READER=stub`: on the Requirements step, type a feature without saving, upload a document, add its features, land on the Estimate tab, then check the Tasks show a suggestion or "No reliable match". Go back to Requirements: the document's features and the typed one are listed. Finish succeeds without "Add at least one feature". Remove one feature, save, reopen the review: it shows "Removed from the request".
-- [ ] 4.2 Run lint, typecheck, Prettier, unit, integration, the build and e2e (twice), all green.
-- [ ] 4.3 On UAT, restart with the new build, open the request "test3", reopen its document review, and add the 15 features again. Check they stay after "Back to Requirements" and Finish, and that the Estimate tab shows their Tasks with hours or "No reliable match".
-- [ ] 4.4 Open a PR. Verify CI is green on the PR.
+- [x] 4.2 Run lint, typecheck, Prettier, unit, integration, the build and e2e (twice), all green.
+- [x] 4.3 On UAT, restart with the new build, open the request "test3", reopen its document review, and add the 15 features again. Check they stay after "Back to Requirements" and Finish, and that the Estimate tab shows their Tasks with hours or "No reliable match".
+- [x] 4.4 Open a PR. Verify CI is green on the PR.
 
 ## Workflow follow-up
 
