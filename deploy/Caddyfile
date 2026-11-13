@@ -1,0 +1,11 @@
+# HTTPS for the F3 Estimation Tool. Caddy gets and renews a Let's Encrypt certificate for
+# APP_DOMAIN by itself; the domain's DNS must point at this server and ports 80 and 443 must
+# be open. Requests go to the app container over Docker's internal network.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	# Requirement documents can be up to 25 MB (specs/requirement-documents).
+	request_body {
+		max_size 30MB
+	}
+	reverse_proxy app:3000
+}

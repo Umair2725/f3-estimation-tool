@@ -68,6 +68,8 @@ docker compose up --build    # database + app; http://localhost:3000
 
 The app container checks its settings, applies migrations, then starts. It runs in production mode, so development sign-in is off: it needs `AUTH_SECRET` and the Google settings below in `.env`.
 
+To run it on a server with HTTPS and a managed database, see [deploy/README.md](deploy/README.md).
+
 ### Check it works
 
 - Home page: http://localhost:3000
